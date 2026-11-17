@@ -1,1 +1,0 @@
-export const CONFIG={THREE_URL:'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',GLTF_URL:'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js',MODEL_URL:'./assets/enemy_shell.glb',COUNTS:[12,18,24,30,36],SPEEDS:[.055,.065,.075,.085,.095],MOVE_SPEED:.19,MAX_PIXEL_RATIO:1.25,MAX_ENEMIES:36};
