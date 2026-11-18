@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#071522">
+<title>Cooking With SPAA</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
+</head>
+<body>
+<div id="game" class="not-loaded">
+  <canvas id="scene"></canvas>
+  <div id="lookSurface" aria-label="視点操作エリア"></div>
+  <div id="hud">
+    <div id="modeBanner" class="hidden-mode">HOME BASE</div>
+    
+    <div id="holdGaugeWrap" class="hidden">
+      <div class="hold-label">スキン変更パネル起動中…</div>
+      <div class="hold-bar"><div id="holdGaugeFill"></div></div>
+    </div>
+
+    <header class="battle-only hidden-mode">
+      <div class="header-left">
+        <div class="logo">COOKING <i>WITH</i> SPAA</div>
+        <button id="abortBattleBtn" class="abort-btn">ホームへ戻る</button>
+      </div>
+      <div class="stats">
+        <span>WAVE <b id="wave">1 / 5</b></span>
+        <span>TARGETS <b id="remaining">0</b></span>
+        <span>PEACE <b id="peace">100%</b></span>
+      </div>
+    </header>
+    <div id="announce" class="battle-only hidden-mode">WORLD PEACE DEFENSE SYSTEM</div>
+    <div id="reticle" class="battle-only hidden-mode">+</div>
+    
+    <div id="controls">
+      <div id="stick" aria-label="移動スティック"><div id="stickKnob"></div></div>
+      <div class="right-controls battle-only hidden-mode">
+        <button id="fire">PULSE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スタート画面 -->
+<div id="startOverlay" class="visible">
+  <div class="start-center-box">
+    <div class="eyebrow">WORLD PEACE DEFENSE PROJECT</div>
+    <h1>COOKING<br>WITH SPAA</h1>
+    <p class="game-desc">上空から降下するミサイルや8方向から迫る戦闘機を迎撃せよ！<br>スキンのアップグレードで攻撃力や連射力を強化しよう。</p>
+    <div id="loadArea" class="hidden">
+      <div class="loadbar"><div id="loadFill"></div></div>
+      <small id="loadText">準備待機中</small>
+    </div>
+  </div>
+  <button id="tapStartBtn">タップしてスタート</button>
+</div>
+
+<!-- フレンド共闘モーダル -->
+<div id="coopModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">FRIEND CO-OP SYSTEM</div>
+    <h2>フレンド共闘ルーム</h2>
+    <p class="modal-sub">部屋主としてルームIDを発行するか、参加者として4桁のルームIDを入力してください。</p>
+    
+    <div class="coop-section">
+      <h3>【部屋主】ルームIDを発行</h3>
+      <button id="createRoomBtn" class="action-btn">4桁ルームIDを発行する</button>
+      <div id="roomCodeDisplay" class="coop-code-display">未発行</div>
+    </div>
+
+    <hr style="border-color:#35586e;margin:16px 0;">
+
+    <div class="coop-section">
+      <h3>【参加者】ルームに参加</h3>
+      <input type="text" id="joinCodeInput" placeholder="4桁のルームID" maxlength="4" class="coop-input">
+      <button id="joinRoomBtn" class="action-btn secondary">既存ルームに参加</button>
+    </div>
+
+    <div id="coopStatusText" class="coop-status">ステータス: 待機中</div>
+    <button id="closeCoopBtn" class="action-btn secondary" style="margin-top:12px;">閉じる</button>
+  </div>
+</div>
+
+<!-- スキン選択モーダル -->
+<div id="skinSelectModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">SKIN EQUIPMENT SYSTEM</div>
+    <h2>解放されたスキン</h2>
+    <p class="modal-sub">使用するスキンを選択して「完了」を押してください</p>
+    <div id="unlockedSkinsList" class="skin-list"></div>
+    <div class="modal-btn-group">
+      <button id="openUpgradeBtn" class="action-btn upgrade-open-btn">現在スキンのアップグレード</button>
+      <button id="confirmSkinBtn" class="action-btn">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- スキンアップグレードモーダル -->
+<div id="skinUpgradeModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">SKIN UPGRADE SYSTEM</div>
+      <div class="store-gold">所持ゴールド: <b id="upgradeGoldVal">0</b> G</div>
+    </div>
+    <h2 id="upgradeSkinTitle">スキンの強化</h2>
+    <p class="modal-sub">初期Lv.1からLv.2以上に強化すると性能が上昇します（初回2000G、以降+500Gずつ増加）</p>
+    <div id="upgradeItemsList" class="skin-list"></div>
+    <button id="closeUpgradeBtn" class="action-btn secondary" style="margin-top:12px;">スキン選択へ戻る</button>
+  </div>
+</div>
+
+<!-- スキンストアモーダル -->
+<div id="skinStoreModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">SKIN STORE</div>
+      <div class="store-gold">所持ゴールド: <b id="storeGoldVal">0</b> G</div>
+    </div>
+    <h2>スキンストア</h2>
+    <p class="modal-sub">ゴールドを消費して新しいスキン（Lv.2〜Lv.8）のロックを解除できます</p>
+    <div id="storeSkinsList" class="skin-list"></div>
+    <button id="closeStoreBtn" class="action-btn secondary">閉じる</button>
+  </div>
+</div>
+
+<!-- バトル終了リザルト画面 -->
+<div id="endOverlay">
+  <div class="panel">
+    <div id="endEyebrow" class="eyebrow">WORLD PEACE RESTORED</div>
+    <h1 id="endTitle">MISSION<br>COMPLETE</h1>
+    <p id="endText">全5ウェーブを突破。</p>
+    <div class="result-actions">
+      <button id="retryBattleBtn" class="action-btn">もう一度リトライ</button>
+      <button id="returnHomeBtn" class="action-btn secondary">ホームへ戻る</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
