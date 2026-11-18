@@ -354,6 +354,224 @@ function controls(){
   const pad=$('#stick'),knob=$('#stickKnob');let stickId=null;
   function stickMove(e){
     if(modalOpen)return;
+    const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;
+    
+    // 【変更】操作感知距離を従来の1.5倍に拡大（maxを1.5倍にすることで、より広い範囲のドラッグを受け付けます）
+    const max=(r.width*.32)*1.5;
+    
+    const len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);
+    
+    // スティックの左右の向きをプレイヤー視点に合わせて正常化
+    move.x = (dx / max) * k;
+    move.y = (dy / max) * k;
+    
+    // 見た目のノブの位置はパッドからはみ出さないよう元のスケール内で制限
+    const visualMax = r.width * .32;
+    const vK = Math.min(1, visualMax / (Math.hypot(dx,dy)||1));
+    knob.style.transform=`translate(${dx * vK}px,${dy * vK}px)`;
+  }
+  pad.addEventListener('pointerdown',e=>{if(modalOpen)return;e.preventDefault();stickId=e.pointerId;pad.setPointerCapture(e.pointerId);stickMove(e)});
+  pad.addEventListener('pointermove',e=>{if(modalOpen)return;if(e.pointerId===stickId){e.preventDefault();stickMove(e)}});
+  const resetStick=()=>{stickId=null;move.x=move.y=0;knob.style.transform='translate(0,0)'};
+  pad.addEventListener('pointerup',resetStick);
+  pad.addEventListener('pointercancel',resetStick);
+  
+  addEventListener('keydown',e=>{
+    if(modalOpen)return;
+    keys[e.code]=true;
+    if(e.code==='Space'){e.preventDefault();shoot()}
+  });
+  addEventListener('keyup',e=>keys[e.code]=false);
+  addEventListener('blur',()=>{resetMovementInputs()});
+  addEventListener('resize',()=>{
+    if(renderer){
+      renderer.setSize(innerWidth,innerHeight,false);
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+    }
+  });
+  
+  document.addEventListener('contextmenu',e=>e.preventDefault());
+  document.addEventListener('selectstart',e=>e.preventDefault());
+  document.addEventListener('gesturestart',e=>e.preventDefault());
+  document.addEventListener('touchmove',e=>{
+    if(modalOpen)return;
+    if(!e.target.closest('#stick, #fire'))e.preventDefault();
+  },{passive:false});
+}
+
+function inZone(px, pz, zone){
+  return Math.abs(px - zone.x) <= zone.halfX && Math.abs(pz - zone.z) <= zone.halfZ;
+}
+
+function handleTriggers(dt){
+  if(modalOpen)return;
+  if(triggerCooldown>0){triggerCooldown--;return;}
+  
+  if(gameMode==='home' && homeController){
+    for(const tr of homeController.triggers){
+      if(Math.hypot(x-tr.x,z-tr.z)<tr.radius){
+        triggerCooldown=60;
+        if(tr.id==='gamestart'){startBattle();return;}
+        if(tr.id==='skin'){enterSkinRoom();return;}
+      }
+    }
+  } else if(gameMode==='skin' && skinController){
+    const zns=skinController.zones;
+    if(inZone(x, z, zns.backHome)){
+      triggerCooldown=60;
+      enterHome();
+      return;
+    }
+    if(inZone(x, z, zns.store)){
+      triggerCooldown=60;
+      openSkinStoreModal();
+      return;
+    }
+    if(inZone(x, z, zns.selectPanel)){
+      panelHoldTime += dt;
+      updateHoldGauge(panelHoldTime / 1.0);
+      if(panelHoldTime >= 1.0){
+        panelHoldTime = 0;
+        updateHoldGauge(0);
+        openSkinSelectModal();
+      }
+    } else {
+      if(panelHoldTime > 0){
+        panelHoldTime = 0;
+        updateHoldGauge(0);
+      }
+    }
+  }
+}
+
+function animate(now=performance.now()){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.1, (now - lastFrameTime) / 1000);
+  lastFrameTime = now;
+
+  if(!modalOpen){
+    if(gameMode==='home' || gameMode==='skin'){
+      const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-move.y;
+      const s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+move.x;
+      const sp=CONFIG.HOME_MOVE_SPEED;
+      
+      // 【変更】プレイヤーが向いている方向（yaw）を基準に、常にカメラ目線の相対方向へ移動するように修正
+      x += (s * Math.cos(yaw) - f * Math.sin(yaw)) * sp;
+      z += (s * Math.sin(yaw) + f * Math.cos(yaw)) * sp;
+      
+      x=T.MathUtils.clamp(x,-9.3,9.3);
+      z=T.MathUtils.clamp(z,-9.3,9.3);
+      camera.position.set(x,1.65,z);
+      camera.rotation.order='YXZ';
+      camera.rotation.y=yaw;
+      camera.rotation.x=pitch;
+      handleTriggers(dt);
+    } else if(gameMode==='battle'){
+      const skin=getEquippedSkin();
+      const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-move.y;
+      const s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+move.x;
+      const sp=CONFIG.MOVE_SPEED * skin.stats.moveMult;
+      
+      // 【変更】バトル中も同様に、プレイヤーの向いている視線方向を基準にした相対移動に変更
+      x += (s * Math.cos(yaw) - f * Math.sin(yaw)) * sp;
+      z += (s * Math.sin(yaw) + f * Math.cos(yaw)) * sp;
+      
+      x=T.MathUtils.clamp(x,-12,12);
+      z=T.MathUtils.clamp(z,-1,12);
+      camera.position.set(x,1.25,z);
+      camera.rotation.order='YXZ';
+      camera.rotation.y=yaw;
+      camera.rotation.x=pitch;
+      tick++;
+      
+      const fighterCount=wave===2?1:(wave===5?2:0),total=CONFIG.COUNTS[wave-1]+fighterCount;
+      if(spawned<total&&tick>Math.max(13,40-wave*4)){
+        if(enemies.length<CONFIG.MAX_ENEMIES){
+          const isFighter=spawned>=CONFIG.COUNTS[wave-1];
+          enemies.push(spawn(T,scene,target,wave,CONFIG,isFighter?'fighter':'missile',modelTemplates));
+        }
+        spawned++;tick=0;
+      }
+      for(let i=enemies.length-1;i>=0;i--){
+        const e=enemies[i];
+        e.position.z+=e.userData.speed;
+        e.position.x+=Math.sin(performance.now()*.0007+e.userData.phase)*.012;
+        e.rotation.z+=.0015;
+        if(e.position.z>z+5){
+          scene.remove(e);
+          enemies.splice(i,1);
+          peace-=wave<3?5:7;
+        }
+      }
+      if(peace<=0){peace=0;updateBattleHud();finishBattle(false)}
+      if(spawned===waveTotal()&&!enemies.length){
+        wait++;
+        announce(wave===5?'ALL WAVES CLEARED':'WAVE CLEARED');
+        if(wait>85){
+          if(wave===5)finishBattle(true);
+          else{wave++;beginWave()}
+        }
+      }
+      updateBattleHud();
+    }
+  }
+  
+  for(let i=fx.length-1;i>=0;i--){
+    const a=fx[i];
+    if(a.v)a.m.position.add(a.v);
+    a.m.scale.multiplyScalar(.96);
+    if(--a.life<=0){scene.remove(a.m);fx.splice(i,1)}
+  }
+  if(renderer&&scene&&camera)renderer.render(scene,camera);
+}
+
+loadGameData();
+controls();
+ const el = $(selector);
+    if(el){
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(e);
+      });
+    }
+  };
+
+  addBtnHandler('#tapStartBtn', () => initEngineAndEnterHome());
+  addBtnHandler('#returnHomeBtn', () => enterHome());
+  addBtnHandler('#retryBattleBtn', () => startBattle());
+  addBtnHandler('#fire', () => shoot());
+  addBtnHandler('#confirmSkinBtn', () => {
+    selectedSkinId=pendingSelectedSkinId;
+    saveGameData();
+    if(skinController) skinController.refreshPedestals(unlockedSkins, selectedSkinId);
+    setModeUI('skin', getEquippedSkin());
+    closeAllModals();
+  });
+  addBtnHandler('#closeStoreBtn', () => closeAllModals());
+
+  const lookSurface=$('#lookSurface');
+  let lookPointer=null,lastX=0,lastY=0;
+  lookSurface.addEventListener('pointerdown',e=>{
+    if(modalOpen || gameMode==='start' || gameMode==='end')return;
+    lookPointer=e.pointerId;lastX=e.clientX;lastY=e.clientY;
+    lookSurface.setPointerCapture(e.pointerId);
+  });
+  lookSurface.addEventListener('pointermove',e=>{
+    if(modalOpen)return;
+    if(lookPointer===e.pointerId){
+      look(e.clientX-lastX,e.clientY-lastY);
+      lastX=e.clientX;lastY=e.clientY;
+    }
+  });
+  const stopLook=e=>{if(lookPointer===e.pointerId)lookPointer=null};
+  lookSurface.addEventListener('pointerup',stopLook);
+  lookSurface.addEventListener('pointercancel',stopLook);
+  
+  const pad=$('#stick'),knob=$('#stickKnob');let stickId=null;
+  function stickMove(e){
+    if(modalOpen)return;
     const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,max=r.width*.32,len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);
     
     // 【修正】マイナスを外し、スティックの左右移動の向きを正しく反転修正しました
