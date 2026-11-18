@@ -93,7 +93,7 @@ async function initEngineAndEnterHome(){
     });
   }catch(e){
     console.error(e);
-    loadError(e?.message||'WebGL를初期化できませんでした');
+    loadError(e?.message||'WebGLを初期化できませんでした');
   }
 }
 
@@ -356,11 +356,11 @@ function controls(){
     if(modalOpen)return;
     const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,max=r.width*.32,len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);
     
-    // 【修正】ここで move.x の符号を反転させ、左右の動きを正しく合わせました
-    move.x = -(dx / max) * k;
+    // 【修正】マイナスを外し、スティックの左右移動の向きを正しく反転修正しました
+    move.x = (dx / max) * k;
     move.y = (dy / max) * k;
     
-    knob.style.transform=`translate(${(-move.x)*max}px,${move.y*max}px)`;
+    knob.style.transform=`translate(${move.x*max}px,${move.y*max}px)`;
   }
   pad.addEventListener('pointerdown',e=>{if(modalOpen)return;e.preventDefault();stickId=e.pointerId;pad.setPointerCapture(e.pointerId);stickMove(e)});
   pad.addEventListener('pointermove',e=>{if(modalOpen)return;if(e.pointerId===stickId){e.preventDefault();stickMove(e)}});
