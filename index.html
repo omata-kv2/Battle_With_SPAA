@@ -15,7 +15,6 @@
   <div id="hud">
     <div id="modeBanner" class="hidden-mode">HOME BASE</div>
     
-    <!-- 中央パネル1秒ホールド時の進行ゲージ -->
     <div id="holdGaugeWrap" class="hidden">
       <div class="hold-label">スキン変更パネル起動中…</div>
       <div class="hold-bar"><div id="holdGaugeFill"></div></div>
@@ -55,7 +54,7 @@
   <button id="tapStartBtn">タップしてスタート</button>
 </div>
 
-<!-- 中央パネル呼び出し：解放されたスキン選択モーダル -->
+<!-- スキン選択モーダル -->
 <div id="skinSelectModal" class="modal-overlay">
   <div class="modal-panel">
     <div class="eyebrow">SKIN EQUIPMENT SYSTEM</div>
@@ -66,7 +65,7 @@
   </div>
 </div>
 
-<!-- 東端ストア呼び出し：スキン購入・ロック解除モーダル -->
+<!-- スキンストアモーダル -->
 <div id="skinStoreModal" class="modal-overlay">
   <div class="modal-panel">
     <div class="store-header">
@@ -80,13 +79,16 @@
   </div>
 </div>
 
-<!-- バトル終了リザルト画面 -->
+<!-- バトル終了リザルト画面（リトライ機能付き） -->
 <div id="endOverlay">
   <div class="panel">
     <div id="endEyebrow" class="eyebrow">WORLD PEACE RESTORED</div>
     <h1 id="endTitle">MISSION<br>COMPLETE</h1>
     <p id="endText">全5ウェーブを突破。</p>
-    <button id="returnHomeBtn" class="action-btn">ホームへ戻る</button>
+    <div class="result-actions">
+      <button id="retryBattleBtn" class="action-btn">もう一度リトライ</button>
+      <button id="returnHomeBtn" class="action-btn secondary">ホームへ戻る</button>
+    </div>
   </div>
 </div>
 
