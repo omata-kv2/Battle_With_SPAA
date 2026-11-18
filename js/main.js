@@ -8,14 +8,13 @@ import {buildSkinStage} from './skin-builder.js';
 
 let renderer,scene,camera,target,ready=false,loop=false;
 let gameMode='start'; // 'start' | 'home' | 'skin' | 'battle' | 'end'
-let modalOpen=false; // パネル操作中フラグ（他の操作をロック）
+let modalOpen=false;
 
 const modelTemplates={missile:null,fighter:null};
 const enemies=[],fx=[],keys={},move={x:0,y:0};
 let wave=1,peace=100,spawned=0,tick=0,wait=0,score=0,earnedGoldInMatch=0,gold=0;
 let yaw=0,pitch=-.05,x=0,z=9;
 
-// スキン進行データ（ローカルストレージ保存対象）
 let unlockedSkins=['first'];
 let selectedSkinId='first';
 let pendingSelectedSkinId='first';
@@ -94,7 +93,7 @@ async function initEngineAndEnterHome(){
     });
   }catch(e){
     console.error(e);
-    loadError(e?.message||'WebGLを初期化できませんでした');
+    loadError(e?.message||'WebGL를初期化できませんでした');
   }
 }
 
@@ -121,7 +120,6 @@ function enterSkinRoom(){
   gameMode='skin';
   setModeUI('skin', getEquippedSkin());
   skinController=buildSkinStage(T,scene,CONFIG.SKINS,unlockedSkins,selectedSkinId);
-  // 西の端中央マスに東を向いてスポーン
   x=skinController.spawnPos.x;
   z=skinController.spawnPos.z;
   yaw=skinController.spawnYaw;
@@ -163,7 +161,6 @@ function shoot(){
     const c=new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     const dist=ray.ray.distanceToPoint(c),along=camera.position.distanceTo(c);
-    // スキン能力：ビーム当たり判定半径（beamRadius）が変化
     if(dist<skin.stats.beamRadius && along<best){hit=e;best=along}
   }
   const a=camera.position.clone(),b=hit?hit.position.clone():a.clone().add(d.multiplyScalar(30));
@@ -183,7 +180,6 @@ function shoot(){
     scene.remove(hit);
     enemies.splice(enemies.indexOf(hit),1);
     const basePts=(hit.userData.kind==='fighter')?CONFIG.SCORE_FIGHTER:CONFIG.SCORE_MISSILE;
-    // スキン能力：スコア＆ゴールド獲得倍率（scoreMult）が変化
     const gained=Math.round(basePts * skin.stats.scoreMult);
     score+=gained;
     earnedGoldInMatch+=gained;
@@ -206,7 +202,6 @@ function finishBattle(win){
   showEndScreen(win,score,earnedGoldInMatch);
 }
 
-/* ====== モーダルUI制御（パネル操作中は他の操作を完全ロック） ====== */
 function resetMovementInputs(){
   for(const k in keys) keys[k]=false;
   move.x=0; move.y=0;
@@ -221,7 +216,6 @@ function closeAllModals(){
   triggerCooldown=50;
 }
 
-// 中央パネル（1秒以上接触）で呼び出されるスキン選択画面
 function openSkinSelectModal(){
   resetMovementInputs();
   modalOpen=true;
@@ -247,7 +241,8 @@ function renderSkinSelectList(){
       </div>
       <div class="skin-badge">${pendingSelectedSkinId===skin.id ? '選択中' : 'タップで選択'}</div>
     `;
-    item.addEventListener('click',()=>{
+    item.addEventListener('pointerdown',(e)=>{
+      e.preventDefault();
       pendingSelectedSkinId=skin.id;
       renderSkinSelectList();
     });
@@ -255,7 +250,6 @@ function renderSkinSelectList(){
   });
 }
 
-// 東端スキンストアで呼び出される購入・解放画面
 function openSkinStoreModal(){
   resetMovementInputs();
   modalOpen=true;
@@ -293,7 +287,8 @@ function renderSkinStoreList(){
     
     if(!isUnlocked){
       const btn=item.querySelector('.buy-btn');
-      btn.addEventListener('click',()=>{
+      btn.addEventListener('pointerdown',(e)=>{
+        e.preventDefault();
         if(gold>=skin.price && !unlockedSkins.includes(skin.id)){
           gold-=skin.price;
           unlockedSkins.push(skin.id);
@@ -314,23 +309,29 @@ function look(dx,dy){
 }
 
 function controls(){
-  $('#tapStartBtn').addEventListener('click',initEngineAndEnterHome);
-  $('#returnHomeBtn').addEventListener('click',enterHome);
-  $('#fire').addEventListener('pointerdown',e=>{e.preventDefault();shoot()});
-  
-  // スキン選択モーダル「完了」ボタン
-  $('#confirmSkinBtn').addEventListener('click',()=>{
+  const addBtnHandler = (selector, handler) => {
+    const el = $(selector);
+    if(el){
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(e);
+      });
+    }
+  };
+
+  addBtnHandler('#tapStartBtn', () => initEngineAndEnterHome());
+  addBtnHandler('#returnHomeBtn', () => enterHome());
+  addBtnHandler('#retryBattleBtn', () => startBattle());
+  addBtnHandler('#fire', () => shoot());
+  addBtnHandler('#confirmSkinBtn', () => {
     selectedSkinId=pendingSelectedSkinId;
     saveGameData();
     if(skinController) skinController.refreshPedestals(unlockedSkins, selectedSkinId);
     setModeUI('skin', getEquippedSkin());
     closeAllModals();
   });
-
-  // スキンストア「閉じる」ボタン
-  $('#closeStoreBtn').addEventListener('click',()=>{
-    closeAllModals();
-  });
+  addBtnHandler('#closeStoreBtn', () => closeAllModals());
 
   const lookSurface=$('#lookSurface');
   let lookPointer=null,lastX=0,lastY=0;
@@ -354,8 +355,12 @@ function controls(){
   function stickMove(e){
     if(modalOpen)return;
     const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,max=r.width*.32,len=Math.hypot(dx,dy)||1,k=Math.min(1,max/len);
-    move.x=dx/max*k;move.y=dy/max*k;
-    knob.style.transform=`translate(${move.x*max}px,${move.y*max}px)`;
+    
+    // 【修正】ここで move.x の符号を反転させ、左右の動きを正しく合わせました
+    move.x = -(dx / max) * k;
+    move.y = (dy / max) * k;
+    
+    knob.style.transform=`translate(${(-move.x)*max}px,${move.y*max}px)`;
   }
   pad.addEventListener('pointerdown',e=>{if(modalOpen)return;e.preventDefault();stickId=e.pointerId;pad.setPointerCapture(e.pointerId);stickMove(e)});
   pad.addEventListener('pointermove',e=>{if(modalOpen)return;if(e.pointerId===stickId){e.preventDefault();stickMove(e)}});
@@ -405,19 +410,16 @@ function handleTriggers(dt){
     }
   } else if(gameMode==='skin' && skinController){
     const zns=skinController.zones;
-    // 1. ホームへ戻る
     if(inZone(x, z, zns.backHome)){
       triggerCooldown=60;
       enterHome();
       return;
     }
-    // 2. スキンストア（東端）
     if(inZone(x, z, zns.store)){
       triggerCooldown=60;
       openSkinStoreModal();
       return;
     }
-    // 3. 中央スキン変更パネル（1秒以上触れるとUI呼び出し）
     if(inZone(x, z, zns.selectPanel)){
       panelHoldTime += dt;
       updateHoldGauge(panelHoldTime / 1.0);
@@ -458,7 +460,6 @@ function animate(now=performance.now()){
       const skin=getEquippedSkin();
       const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-move.y;
       const s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+move.x;
-      // スキン能力：移動速度倍率（moveMult）を適用
       const sp=CONFIG.MOVE_SPEED * skin.stats.moveMult;
       x+=(s*Math.cos(yaw)-f*Math.sin(yaw))*sp;
       z+=(s*Math.sin(yaw)-f*Math.cos(yaw))*sp;
