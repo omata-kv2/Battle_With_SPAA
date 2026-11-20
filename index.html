@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#071522">
+<title>Cooking With SPAA</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
+</head>
+<body>
+<div id="game" class="not-loaded">
+  <canvas id="scene"></canvas>
+  <div id="lookSurface" aria-label="視点操作エリア"></div>
+  <div id="hud">
+    <!-- 左上全体チャット（初期は縮小状態） -->
+    <div id="globalChatWrap" class="chat-collapsed">
+      <button type="button" id="chatToggleBtn" aria-label="全体チャットを開く">
+        💬
+        <span id="chatUnreadDot" class="chat-unread-dot hidden"></span>
+      </button>
+      <div id="chatPanel" class="hidden">
+        <div class="chat-header">
+          <span class="chat-title">全体チャット <small id="chatOnlineCount">(接続中...)</small></span>
+          <button type="button" id="chatMinimizeBtn" title="縮小する">－</button>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="チャットを入力..." maxlength="80" autocomplete="off">
+          <button type="button" id="chatSendBtn">送信</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modeBanner" class="hidden-mode">HOME BASE</div>
+    <div id="toastBanner" class="hidden"></div>
+    
+    <div id="holdGaugeWrap" class="hidden">
+      <div class="hold-label">機体変更パネル起動中…</div>
+      <div class="hold-bar"><div id="holdGaugeFill"></div></div>
+    </div>
+
+    <header class="battle-only hidden-mode">
+      <div class="header-left">
+        <div class="logo">COOKING <i>WITH</i> SPAA</div>
+        <button id="abortBattleBtn" class="abort-btn">ホームへ戻る</button>
+      </div>
+      <div class="stats">
+        <span><em id="stat1Label">WAVE</em> <b id="wave">1 / 5</b></span>
+        <span><em id="stat2Label">TARGETS</em> <b id="remaining">0</b></span>
+        <span><em id="stat3Label">PEACE</em> <b id="peace">100%</b></span>
+      </div>
+    </header>
+    <div id="announce" class="battle-only hidden-mode">WORLD PEACE DEFENSE SYSTEM</div>
+    <div id="reticle" class="battle-only hidden-mode">+</div>
+    
+    <div id="controls">
+      <div id="stick" aria-label="移動スティック"><div id="stickKnob"></div></div>
+      <div class="right-controls battle-only hidden-mode" id="fireWrap">
+        <button id="fire">PULSE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- スタート画面 -->
+<div id="startOverlay" class="visible">
+  <div class="start-center-box">
+    <div class="eyebrow">WORLD PEACE DEFENSE PROJECT</div>
+    <h1>COOKING<br>WITH SPAA</h1>
+    <p class="game-desc">上空から降下するミサイルや戦闘機を迎撃し、時には空挺ミサイルを操縦せよ！<br>フレンド共闘や機体強化で世界平和を守れ。</p>
+    <div id="loadArea" class="hidden">
+      <div class="loadbar"><div id="loadFill"></div></div>
+      <small id="loadText">準備待機中</small>
+    </div>
+  </div>
+  <button id="tapStartBtn">タップしてスタート</button>
+</div>
+
+<!-- 初回ユーザネーム入力モーダル -->
+<div id="usernameModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">PLAYER SETUP</div>
+    <h2>ユーザネームの設定</h2>
+    <p class="modal-sub">ゲームで使用するユーザネームを入力してください（10文字以内）</p>
+    <input type="text" id="usernameInput" placeholder="例: パルス防衛官" maxlength="10" class="coop-input" style="margin:16px 0;">
+    <button id="saveUsernameBtn" class="action-btn">決定してゲームへ</button>
+  </div>
+</div>
+
+<!-- ゲームモード＆難易度選択モーダル -->
+<div id="battleSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">MISSION BRIEFING</div>
+    <h2>出撃モード・難易度選択</h2>
+    <p class="modal-sub">① ゲームモードを選択 → ② 難易度を選択 → ③ 出撃開始</p>
+
+    <div class="setup-section">
+      <div class="setup-step-label">① ゲームモード設定（必須）</div>
+      <div class="mode-btn-grid">
+        <button type="button" class="setup-mode-btn" data-mode="FALL_MISSILE">
+          <strong>FALL MISSILE</strong>
+          <span>地上防衛戦 / 5〜10 WAVE迎撃</span>
+        </button>
+        <button type="button" class="setup-mode-btn" data-mode="AIR_STRIKE">
+          <strong>AIR STRIKE</strong>
+          <span>高度100mミサイル降下・障害物回避</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-step-label">② 難易度選択 <small id="diffLockHint">（※先にゲームモードを選択してください）</small></div>
+      <div id="difficultyBtnGrid" class="diff-btn-grid"></div>
+    </div>
+
+    <div id="setupPreviewBox" class="setup-preview-box">
+      ゲームモードと難易度を選択してください。
+    </div>
+
+    <div class="setup-footer-btns">
+      <button type="button" id="cancelSetupBtn" class="action-btn secondary" style="flex:0.7;">キャンセル</button>
+      <button type="button" id="confirmStartBattleBtn" class="action-btn" disabled style="flex:1.3;">出撃スタート</button>
+    </div>
+  </div>
+</div>
+
+<!-- フレンド共闘モーダル -->
+<div id="coopModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">FRIEND CO-OP SYSTEM</div>
+    <h2>フレンド共闘ルーム</h2>
+    <p class="modal-sub">部屋主としてルームIDを発行・募集するか、全体チャットに表示された4桁のルームIDを入力して参加できます。</p>
+    
+    <div class="coop-section">
+      <h3>【部屋主】ルームIDを発行・全体募集</h3>
+      <button id="createRoomBtn" class="action-btn">4桁ルームIDを発行する</button>
+      <div id="roomCodeDisplay" class="coop-code-display">未発行</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button id="recruitCoopBtn" class="action-btn recruit-btn" disabled style="flex:1;">全体チャットで募集する</button>
+        <button id="cancelRecruitBtn" class="action-btn secondary" style="display:none;flex:0.7;border-color:#ff88ff;color:#ffccff;">募集取消</button>
+      </div>
+    </div>
+
+    <hr style="border-color:#35586e;margin:16px 0;">
+
+    <div class="coop-section">
+      <h3>【参加者】ルームに参加</h3>
+      <input type="text" id="joinCodeInput" placeholder="4桁のルームID" maxlength="4" class="coop-input">
+      <button id="joinRoomBtn" class="action-btn secondary">既存ルームに参加</button>
+    </div>
+
+    <div id="coopStatusText" class="coop-status">ステータス: 待機中</div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button id="leaveCoopRoomBtn" class="action-btn secondary" style="background:#8b263e;border-color:#ff6b81;flex:1;display:none;">ルームから退出</button>
+      <button id="closeCoopBtn" class="action-btn secondary" style="flex:1;">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 機体選択モーダル -->
+<div id="skinSelectModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">UNIT EQUIPMENT SYSTEM</div>
+    <h2>解放された機体</h2>
+    <p class="modal-sub">使用する機体を選択して「完了」を押してください</p>
+    <div id="unlockedSkinsList" class="skin-list"></div>
+    <div class="modal-btn-group">
+      <button id="openUpgradeBtn" class="action-btn upgrade-open-btn">現在機体のアップグレード</button>
+      <button id="confirmSkinBtn" class="action-btn">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 機体アップグレードモーダル -->
+<div id="skinUpgradeModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">UNIT UPGRADE SYSTEM</div>
+      <div class="store-gold">所持ゴールド: <b id="upgradeGoldVal">0</b> G</div>
+    </div>
+    <h2 id="upgradeSkinTitle">機体の強化</h2>
+    <p class="modal-sub">初期Lv.1からLv.2以上に強化すると性能が上昇します（初回2000G、以降+500Gずつ増加）</p>
+    <div id="upgradeItemsList" class="skin-list"></div>
+    <button id="closeUpgradeBtn" class="action-btn secondary" style="margin-top:12px;">機体選択へ戻る</button>
+  </div>
+</div>
+
+<!-- 機体ショップモーダル -->
+<div id="skinStoreModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">UNIT SHOP</div>
+      <div class="store-gold">所持ゴールド: <b id="storeGoldVal">0</b> G</div>
+    </div>
+    <h2>機体ショップ</h2>
+    <p class="modal-sub">ゴールドを消費して新しい機体（Lv.2〜Lv.8）のロックを解除できます</p>
+    <div id="storeSkinsList" class="skin-list"></div>
+    <button id="closeStoreBtn" class="action-btn secondary">閉じる</button>
+  </div>
+</div>
+
+<!-- バトル終了リザルト画面 -->
+<div id="endOverlay">
+  <div class="panel">
+    <div id="endEyebrow" class="eyebrow">WORLD PEACE RESTORED</div>
+    <h1 id="endTitle">MISSION<br>COMPLETE</h1>
+    <p id="endText">全ウェーブを突破。</p>
+    <div class="result-actions">
+      <button id="retryBattleBtn" class="action-btn">もう一度リトライ</button>
+      <button id="returnHomeBtn" class="action-btn secondary">ホームへ戻る</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
