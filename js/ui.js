@@ -67,7 +67,7 @@ export function setModeUI(mode, equippedSkin, isCoop=false, isHost=true, battleG
     else el.classList.add('hidden-mode');
   });
 
-  // AIR STRIKE時はレティクルと射撃ボタンを非表示
+  // AIR STRIKE時はレティクルと射撃・固有能力ボタンを非表示
   const reticle = $('#reticle');
   const fireWrap = $('#fireWrap');
   if(mode === 'battle' && battleGameMode === 'AIR_STRIKE'){
@@ -108,6 +108,47 @@ export function updateHoldGauge(ratio){
     wrap.classList.remove('hidden');
     $('#holdGaugeFill').style.width = Math.min(100, Math.round(ratio * 100)) + '%';
   }
+}
+
+export function updateChargeGauge(ratio, labelText='CHARGING…'){
+  const wrap = $('#chargeGaugeWrap');
+  if(!wrap) return;
+  if(ratio <= 0){
+    wrap.classList.add('hidden');
+  } else {
+    wrap.classList.remove('hidden');
+    const lbl = $('#chargeLabel');
+    if(lbl) lbl.textContent = labelText;
+    $('#chargeGaugeFill').style.width = Math.min(100, Math.round(ratio * 100)) + '%';
+  }
+}
+
+export function updateSkillButtonUI(skillName, skillLv, state, remainSec=0){
+  const btn = $('#skillBtn');
+  const nameEl = $('#skillBtnName');
+  const subEl = $('#skillBtnSub');
+  if(!btn || !nameEl || !subEl) return;
+
+  nameEl.textContent = `${skillName} Lv.${skillLv}`;
+  btn.classList.remove('active', 'cooldown');
+
+  if(state === 'active'){
+    btn.classList.add('active');
+    subEl.textContent = `発動中 ${remainSec.toFixed(1)}s`;
+  } else if(state === 'cooldown'){
+    btn.classList.add('cooldown');
+    subEl.textContent = `CD ${remainSec.toFixed(1)}s`;
+  } else {
+    subEl.textContent = 'READY!';
+  }
+}
+
+export function updateFireButtonUI(label, modeClass=''){
+  const btn = $('#fire');
+  if(!btn) return;
+  btn.textContent = label;
+  btn.classList.remove('charging', 'cooldown', 'infinity', 'laser-active');
+  if(modeClass) btn.classList.add(modeClass);
 }
 
 export function setHudLabels(l1, l2, l3){
