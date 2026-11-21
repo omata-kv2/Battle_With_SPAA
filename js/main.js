@@ -3546,3 +3546,4 @@ addEventListener('keyup',e=>{
 addEventListener('resize',()=>{if(!renderer)return;renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()});
 
 loadGameData();
+controls();
