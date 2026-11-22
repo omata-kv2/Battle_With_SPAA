@@ -63,12 +63,13 @@ export function getSkinUpgrade(skinId){
     state.skinUpgrades[normId] = {
       atk: 1, def: 1, hp: 1, rate: 1, score: 1, blast: 1,
       duration: 1, volley: 1, vertexShots: 1,
+      turretCount: 1, laserTurretCount: 1,
       faith: 1, gayPower: 1, saint: 1,
       skill: 1
     };
   }
   const u = state.skinUpgrades[normId];
-  const keysList = ['atk', 'def', 'hp', 'rate', 'score', 'blast', 'duration', 'volley', 'vertexShots', 'faith', 'gayPower', 'saint', 'skill'];
+  const keysList = ['atk', 'def', 'hp', 'rate', 'score', 'blast', 'duration', 'volley', 'vertexShots', 'turretCount', 'laserTurretCount', 'faith', 'gayPower', 'saint', 'skill'];
   for(const k of keysList){
     if(typeof u[k] !== 'number') u[k] = 1;
   }
@@ -104,8 +105,12 @@ export function getEffectiveStats(skin){
   const autoVolleyCount = (skin.baseVolleyCount || 2) + (upg.volley - 1);
   const wirbelVertexShots = 1 + upg.vertexShots;
 
+  const rapidTurretCount = Math.max(1, Math.min(5, upg.turretCount || 1));
+  const laserTurretCount = Math.max(1, Math.min(5, upg.laserTurretCount || 1));
+  const additionalTurreDuration = Number((10.0 + (skillLv - 1) * 1.0).toFixed(1));
+
   const originBurstTargets = Math.round(5 + (skillLv - 1) * (25 / 9));
-  const turretFireRate = skillLv;
+  const turretFireRate = rawRate;
   const fewChargerReduction = Number((0.5 + (skillLv - 1) * 0.1).toFixed(1));
   const infinitySpreadMult = Number((1.1 + (skillLv - 1) * (0.9 / 9)).toFixed(2));
   const neverStopperDuration = Number(Math.min(15.0, 10.0 + skillLv * 0.5).toFixed(1));
@@ -125,6 +130,9 @@ export function getEffectiveStats(skin){
     laserDurationSec,
     autoVolleyCount,
     wirbelVertexShots,
+    rapidTurretCount,
+    laserTurretCount,
+    additionalTurreDuration,
     skillLv,
     originBurstTargets,
     turretFireRate,

@@ -135,7 +135,7 @@ export function renderSkinSelectList(){
     } else if(skin.attackType === 'scatter'){
       statSummary = `攻撃力:${eff.atk}×7散弾 / 体力:${eff.hp} / スコア倍率:${eff.scoreMult.toFixed(2)}x`;
     } else if(skin.attackType === 'laser'){
-      statSummary = `光線攻撃力:${eff.atk} / スコア倍率:${eff.scoreMult.toFixed(2)}x / 照射時間:${eff.laserDurationSec}s`;
+      statSummary = `光線攻撃力:${eff.atk} / タレット数:${eff.laserTurretCount}基 / 照射時間:${eff.laserDurationSec}s`;
     } else if(skin.attackType === 'automatic'){
       statSummary = `攻撃力:${eff.atk} / 防御力:${eff.def} / 体力:${eff.hp} / 同時発射:${eff.autoVolleyCount}発`;
     } else if(skin.attackType === 'wirbelwind'){
@@ -143,7 +143,7 @@ export function renderSkinSelectList(){
     } else if(skin.attackType === 'beast'){
       statSummary = `攻撃力:${eff.atk} / 防御力:${eff.def} / 体力:${eff.hp} / 同時弾数:${eff.shotCount}発 / スコア:${eff.scoreMult.toFixed(2)}x`;
     } else if(skin.id === 'RapidFire'){
-      statSummary = `連射数:${eff.shotCount}発 / 防御力:${eff.def} / 体力:${eff.hp}`;
+      statSummary = `攻撃力:${eff.atk} / 連射数:${eff.shotCount}発 / スキルタレット:${eff.rapidTurretCount}基`;
     } else {
       statSummary = `攻撃力:${eff.atk} / 防御力:${eff.def} / 体力:${eff.hp}`;
     }
@@ -201,6 +201,12 @@ function getUpgradeItemMeta(skin, upgKey){
   }
   if(upgKey === 'volley'){
     return { title: '弾数増加', desc: `現在の同時発射数: ${eff.autoVolleyCount}発（Lv.10で11発同時発射）`, swatch: 'VOLLEY', color: '#c77dff' };
+  }
+  if(upgKey === 'turretCount'){
+    return { title: 'タレット数増加', desc: `現在の同時設置タレット数: ${eff.rapidTurretCount}基（初期1基 / 最大5基・攻撃力＆連射力は本体と同値）`, swatch: 'TURRET', color: '#4de680' };
+  }
+  if(upgKey === 'laserTurretCount'){
+    return { title: 'タレット数増加', desc: `現在の設置可能タレット数: ${eff.laserTurretCount}基（初期1基 / 最大5基・Mk.1〜Mk.${eff.laserTurretCount}攻撃対応）`, swatch: 'TURRET', color: '#ff4d6d' };
   }
   if(upgKey === 'vertexShots'){
     const upg = getSkinUpgrade('Wirbelwind');
@@ -279,7 +285,7 @@ export function renderUpgradeList(){
   if(skill.id === 'OriginBurst'){
     skillEffectDetail = `現在効果: 最大 ${eff.originBurstTargets}体 一掃（CD ${skill.cooldown}秒）`;
   } else if(skill.id === 'AdditionalTurre'){
-    skillEffectDetail = `現在効果: 10秒間タレット設置・連射力 ${eff.turretFireRate}（CD ${skill.cooldown}秒）`;
+    skillEffectDetail = `現在効果: ${eff.additionalTurreDuration}秒間 タレット${eff.rapidTurretCount}基を均等配置（攻撃力${eff.atk} / 連射速度${eff.rawRate.toFixed(1)}・本体同値）`;
   } else if(skill.id === 'FewCharger'){
     skillEffectDetail = `現在効果: 10秒間溜め時間 -${eff.fewChargerReduction}秒（CD ${skill.cooldown}秒）`;
   } else if(skill.id === 'InfinityBarrel'){

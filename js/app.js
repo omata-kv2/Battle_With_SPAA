@@ -12,7 +12,7 @@ import {
 import { makeTarget, prepareModel } from './map-fall-missile.js';
 import { buildHomeStage } from './map-home.js';
 import { buildSkinStage } from './map-skin.js';
-import { resetCombatState } from './player.js';
+import { resetCombatState, initLaserTurretDeployState } from './player.js';
 import { startFallMissileBattle, updateFallMissileMode } from './mode-fall-missile.js';
 import { startAirStrikeBattle, updateAirStrikeFrame, generateAirStrikeMissionData } from './mode-air-strike.js';
 import {
@@ -150,7 +150,7 @@ export function startBattle(modeArg = null, diffIdArg = null, sharedMissionData 
   } else if(skin.attackType === 'scatter'){
     updateFireButtonUI('SCATTER', '');
   } else if(skin.attackType === 'laser'){
-    updateFireButtonUI(`LASER\n${eff.laserDurationSec}s`, '');
+    initLaserTurretDeployState(eff.laserTurretCount);
   } else if(skin.attackType === 'automatic'){
     updateFireButtonUI(`AUTO\n×${eff.autoVolleyCount}`, '');
   } else if(skin.attackType === 'wirbelwind'){

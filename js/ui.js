@@ -73,6 +73,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
   const fireWrap = $('#fireWrap');
 
   if(mode === 'home'){
+    clearLaserAttackButtons();
     if(banner){
       banner.classList.remove('hidden-mode');
       const coopTag = isCoop ? (isHost ? ' [共闘ホスト]' : ' [共闘ゲスト]') : '';
@@ -80,6 +81,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     }
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'skin'){
+    clearLaserAttackButtons();
     if(banner){
       banner.classList.remove('hidden-mode');
       banner.textContent = `UNIT HANGAR — 装備中: ${skin ? skin.name : 'Origin'}`;
@@ -164,9 +166,58 @@ export function updateSkillButtonUI(skillName, skillLv, status, remainSec){
 export function updateFireButtonUI(label, stateClass = ''){
   const btn = $('#fire');
   if(!btn) return;
+  btn.classList.remove('hidden', 'charging', 'laser-active', 'infinity', 'cooldown', 'deploy-mode');
   btn.textContent = label;
-  btn.classList.remove('charging', 'laser-active', 'infinity', 'cooldown');
   if(stateClass) btn.classList.add(stateClass);
+}
+
+export function hideFireButton(){
+  const btn = $('#fire');
+  if(btn) btn.classList.add('hidden');
+}
+
+export function clearLaserAttackButtons(){
+  const stack = $('#laserAttackStack');
+  if(stack){
+    stack.innerHTML = '';
+    stack.classList.add('hidden');
+  }
+}
+
+export function renderLaserAttackButtons(turretCount, onTriggerMk){
+  const stack = $('#laserAttackStack');
+  if(!stack) return;
+  stack.innerHTML = '';
+  stack.classList.remove('hidden');
+  for(let i = 1; i <= turretCount; i++){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = `laserMkBtn_${i}`;
+    btn.className = 'laser-mk-btn';
+    btn.innerHTML = `<span class="mk-title">Mk.${i}攻撃</span><span class="mk-sub">READY</span>`;
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if(onTriggerMk) onTriggerMk(i);
+    });
+    stack.appendChild(btn);
+  }
+}
+
+export function updateLaserAttackButtonState(mkIndex, status, remainSec = 0){
+  const btn = $(`#laserMkBtn_${mkIndex}`);
+  if(!btn) return;
+  const sub = btn.querySelector('.mk-sub');
+  btn.classList.remove('active', 'cooldown');
+  if(status === 'active'){
+    btn.classList.add('active');
+    if(sub) sub.textContent = `照射中 ${remainSec.toFixed(1)}s`;
+  } else if(status === 'cooldown'){
+    btn.classList.add('cooldown');
+    if(sub) sub.textContent = `CD ${remainSec.toFixed(1)}s`;
+  } else {
+    if(sub) sub.textContent = 'READY';
+  }
 }
 
 export function hud(wave, remaining, peace, maxWaves = 5){

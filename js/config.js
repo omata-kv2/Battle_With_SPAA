@@ -57,9 +57,10 @@ export const CONFIG = {
         { key: 'def', maxLv: 15 },
         { key: 'hp',  maxLv: 15 },
         { key: 'rate',maxLv: 12 },
+        { key: 'turretCount', maxLv: 5 },
         { key: 'score',maxLv: 10 }
       ],
-      skill: { id: 'AdditionalTurre', name: 'AdditionalTurre', cooldown: 22, duration: 10, maxLv: 10, desc: '10秒間、自動迎撃タレットを前方に設置する。' }
+      skill: { id: 'AdditionalTurre', name: 'AdditionalTurre', cooldown: 22, duration: 10, maxLv: 10, desc: 'マップ内に本体と同等の攻撃力・連射力を持つ自動迎撃タレットを均等距離で複数設置する。' }
     },
     {
       id: 'Explosion', order: 3, name: 'Explosion', price: 6000, color: 0xff9233,
@@ -89,15 +90,16 @@ export const CONFIG = {
     {
       id: 'Laser', order: 5, name: 'Laser', price: 14000, color: 0xff4d6d,
       attackType: 'laser', attackCooldown: 1.0, baseLaserDuration: 3.0,
-      stats: { baseAtk: 2, baseRate: 1.0, scoreMult: 1.15, moveMult: 1.0, beamColor: 0xff4d6d, beamRadius: 1.4, desc: '高出力の光線柱を照射し続け、触れた敵すべてを焼き切る。' },
+      stats: { baseAtk: 2, baseRate: 1.0, scoreMult: 1.15, moveMult: 1.0, beamColor: 0xff4d6d, beamRadius: 1.4, desc: 'マップに四角錐タレットを均等配置し、Mk.1〜Mk.5の個別ボタンから視点先へ赤色レーザーを照射する。' },
       upgrades: [
         { key: 'atk', maxLv: 15 },
+        { key: 'laserTurretCount', maxLv: 5 },
         { key: 'duration', maxLv: 10 },
         { key: 'def', maxLv: 15 },
         { key: 'hp',  maxLv: 15 },
         { key: 'score',maxLv: 10 }
       ],
-      skill: { id: 'NeverStopper', name: 'NeverStopper', cooldown: 26, duration: 12, maxLv: 10, desc: '10〜15秒間光線柱を持続し、光線半径を1.25〜1.7倍に拡大。' }
+      skill: { id: 'NeverStopper', name: 'NeverStopper', cooldown: 26, duration: 12, maxLv: 10, desc: '10〜15秒間全タレットから光線半径1.25〜1.7倍の赤色レーザーを一斉照射する。' }
     },
     {
       id: 'Automatic', order: 6, name: 'Automatic', price: 20000, color: 0xc77dff,

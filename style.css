@@ -333,6 +333,62 @@ header.battle-only{
 #fire.infinity{border-color:var(--gold);box-shadow:0 0 26px rgba(255,210,63,.65)}
 #fire.cooldown{border-color:#4b657a;color:#8aa4b8;box-shadow:none}
 
+/* Laser機体用 Mk.1〜Mk.5 積み上げ攻撃ボタン */
+.laser-attack-stack{
+  display:flex;
+  flex-direction:column-reverse;
+  align-items:flex-end;
+  gap:8px;
+}
+.laser-mk-btn{
+  min-width:116px;
+  padding:8px 13px;
+  border-radius:12px;
+  border:2px solid var(--danger);
+  background:radial-gradient(circle at 30% 30%,rgba(255,77,109,.36),rgba(24,8,16,.92));
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  cursor:pointer;
+  box-shadow:0 4px 16px rgba(255,77,109,.35);
+  touch-action:manipulation;
+}
+.laser-mk-btn .mk-title{
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+.laser-mk-btn .mk-sub{
+  font-size:10px;
+  font-weight:700;
+  color:#ffb3c1;
+}
+.laser-mk-btn.active{
+  border-color:#ffd23f;
+  background:radial-gradient(circle at 30% 30%,rgba(255,77,109,.78),rgba(55,10,20,.96));
+  box-shadow:0 0 22px rgba(255,77,109,.8);
+}
+.laser-mk-btn.active .mk-sub{
+  color:#ffd23f;
+}
+.laser-mk-btn.cooldown{
+  border-color:#4b657a;
+  background:rgba(12,24,36,.85);
+  color:#8aa4b8;
+  box-shadow:none;
+}
+.laser-mk-btn.cooldown .mk-sub{
+  color:#7f99ad;
+}
+#fire.deploy-mode{
+  border-color:#ff4d6d;
+  background:radial-gradient(circle at 30% 30%,rgba(255,77,109,.42),rgba(28,10,18,.94));
+  box-shadow:0 0 24px rgba(255,77,109,.45);
+  font-size:12px;
+}
+
+
 /* ホワイトアウト・スタート・モーダル・リザルト */
 #whiteFadeOverlay{
   position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:90;transition:opacity 2s ease;
