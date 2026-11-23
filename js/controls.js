@@ -2,6 +2,7 @@ import * as T from './libs/three.module.js';
 import { state } from './state.js';
 import { $, updateChargeGauge, updateExplosionChargeMeter } from './ui.js';
 import { combatState, shoot, releaseExplosionCharge, activateUnitSkill } from './player.js';
+import { yajuState, triggerYajuDash, shootYajuRocket } from './mode-yaju-maze.js';
 
 let stickId = null;
 let lookId = null;
@@ -78,7 +79,7 @@ export function initInputControls(getCoopCtx){
   installTouchSelectionGuards();
 
   const handleFirePressStart = () => {
-    if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+    if(state.gameMode !== 'battle' || (state.activeBattleMode !== 'FALL_MISSILE' && state.activeBattleMode !== 'YAJU_BOSS') || state.modalOpen) return;
     combatState.fireHeld = true;
     combatState.autoFireTimer = 0;
     shoot(getCoopCtx());
@@ -166,6 +167,38 @@ export function initInputControls(getCoopCtx){
     });
   }
 
+
+  const yajuDashBtn = $('#yajuDashBtn');
+  if(yajuDashBtn){
+    yajuDashBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerYajuDash();
+    });
+  }
+
+  const yajuSprintBtn = $('#yajuSprintBtn');
+  if(yajuSprintBtn){
+    yajuSprintBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      yajuState.sprintHeld = true;
+    });
+    const endSprint = () => { yajuState.sprintHeld = false; };
+    yajuSprintBtn.addEventListener('pointerup', endSprint);
+    yajuSprintBtn.addEventListener('pointercancel', endSprint);
+    yajuSprintBtn.addEventListener('pointerleave', endSprint);
+  }
+
+  const yajuRocketBtn = $('#yajuRocketBtn');
+  if(yajuRocketBtn){
+    yajuRocketBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      shootYajuRocket();
+    });
+  }
+
   window.addEventListener('keydown', (e) => {
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')){
       return;
@@ -173,7 +206,11 @@ export function initInputControls(getCoopCtx){
     if(!state.modalOpen){
       state.keys[e.code] = true;
       if(e.code === 'Space' && !e.repeat){
-        handleFirePressStart();
+        if(state.activeBattleMode === 'YAJU_MAZE') shootYajuRocket();
+        else handleFirePressStart();
+      }
+      if((e.code === 'KeyE' || e.code === 'ShiftRight') && !e.repeat && (state.activeBattleMode === 'YAJU_MAZE' || state.activeBattleMode === 'YAJU_BOSS')){
+        triggerYajuDash();
       }
       if((e.code === 'KeyE' || e.code === 'KeyQ') && !e.repeat){
         activateUnitSkill(getCoopCtx());

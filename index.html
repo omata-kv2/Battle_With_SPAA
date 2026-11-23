@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#071522">
-<title>Cooking With SPAA v5.0</title>
+<title>Cooking With SPAA v5.1</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
@@ -73,6 +73,69 @@
       <div class="exp-meter-radius" id="expMeterRadius">0.0m</div>
     </div>
     
+
+    <!-- YAJUMAZE / ボス戦用 HUD -->
+    <div id="yajuHud" class="hidden">
+      <img id="yajuRocketHud" src="./assets/items/rocket.png" class="hidden" alt="Rocket">
+      <div class="yaju-hud-top">
+        <div class="yaju-panel" id="yajuStaminaPanel">
+          <div class="yaju-hud-label">STAMINA</div>
+          <div class="yaju-meter"><div id="yajuStaminaFill"></div></div>
+          <div id="yajuStaminaText">20 / 20</div>
+        </div>
+        <div class="yaju-panel hidden" id="yajuHpPanel">
+          <div class="yaju-hud-label">PLAYER HP</div>
+          <div class="yaju-meter"><div id="yajuHpFill"></div></div>
+          <div id="yajuHpText">20 / 20</div>
+        </div>
+        <div class="yaju-panel yaju-status-panel">
+          <div class="yaju-hud-label">FLOOR / STATUS</div>
+          <div id="yajuFloorDisplay">1F</div>
+        </div>
+        <div class="yaju-top-right-slot">
+          <div class="yaju-compass-container" id="yajuCompassContainer">
+            <div class="yaju-compass-wrapper">
+              <div class="yaju-compass-label">EXIT</div>
+              <div class="yaju-compass-circle">
+                <div id="yajuExitNeedle" class="yaju-needle" style="background-color:#8aff9d;"></div>
+                <div id="yajuExitDistance" class="yaju-distance-text">0m</div>
+              </div>
+            </div>
+            <div class="yaju-compass-wrapper">
+              <div class="yaju-compass-label">YAJU</div>
+              <div class="yaju-compass-circle" id="yajuRadar"></div>
+            </div>
+          </div>
+          <div class="yaju-panel yaju-boss-hp-panel hidden" id="yajuBossHpPanel">
+            <div class="yaju-hud-label" id="yajuBossHpLabel">BOSS HP</div>
+            <div class="yaju-meter"><div id="yajuBossHpFill"></div></div>
+            <div id="yajuBossHpText">100 / 100</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="yajuMessage" class="yaju-message"></div>
+
+      <!-- 画面右端中央の小型丸型ロケット発射ボタン -->
+      <button type="button" id="yajuRocketBtn" class="yaju-rocket-btn hidden" aria-label="ロケット発射">
+        <span class="yaju-rocket-label">発射</span>
+        <span id="yajuRocketCount" class="yaju-rocket-count">0</span>
+      </button>
+
+      <div id="yajuControls" class="yaju-controls">
+        <div class="yaju-action-buttons">
+          <div id="yajuDashWrap" class="yaju-dash-wrapper">
+            <svg class="yaju-dash-cd-ring" viewBox="0 0 36 36">
+              <path class="yaju-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path id="yajuDashCdPath" class="yaju-ring-fill" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <button type="button" id="yajuDashBtn" class="yaju-btn-action yaju-btn-dash">突進</button>
+          </div>
+          <button type="button" id="yajuSprintBtn" class="yaju-btn-action yaju-btn-sprint">走る</button>
+        </div>
+      </div>
+    </div>
+
     <div id="controls">
       <div id="stick" aria-label="移動スティック"><div id="stickKnob"></div></div>
       <div class="right-controls battle-only hidden-mode" id="fireWrap">
@@ -264,6 +327,85 @@
     </div>
   </div>
 </div>
+
+
+<!-- YAJUMAZE ルール設定モーダル -->
+<div id="yajuSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">YAJUMAZE MODE</div>
+    <h1 class="yaju-modal-title">YAJUMAZE</h1>
+    <p class="modal-sub">全5階層の迷路脱出、またはボス戦に挑戦しよう。</p>
+
+    <div class="yaju-settings-group">
+      <div class="yaju-toggle-row">
+        <span>累進YAJU数</span>
+        <label class="yaju-switch">
+          <input type="checkbox" id="yajuSettingProgressive" checked>
+          <span class="yaju-slider"></span>
+        </label>
+      </div>
+      <div class="yaju-toggle-row">
+        <span>各種コンパスの使用</span>
+        <label class="yaju-switch">
+          <input type="checkbox" id="yajuSettingCompass" checked>
+          <span class="yaju-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="yaju-setup-btns">
+      <button type="button" id="yajuStartNormalBtn" class="action-btn">この設定でスタート</button>
+      <button type="button" id="yajuOpenBossSetupBtn" class="action-btn upgrade-open-btn">ボス戦</button>
+      <button type="button" id="yajuCancelSetupBtn" class="action-btn secondary">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE ボス・難易度選択モーダル -->
+<div id="yajuBossSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">YAJUMAZE BOSS BATTLE</div>
+    <h2>ボス・難易度選択</h2>
+    <p class="modal-sub">① ボスを選択 → ② 難易度を選択 → ③ ボス戦開始</p>
+
+    <div class="setup-section">
+      <div class="setup-step-label">① ボス選択（必須）</div>
+      <div id="yajuBossBtnGrid" class="mode-btn-grid"></div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-step-label">② 難易度選択 <small id="yajuDiffLockHint">（※先にボスを選択してください）</small></div>
+      <div id="yajuBossDiffGrid" class="diff-btn-grid"></div>
+    </div>
+
+    <div id="yajuBossPreviewBox" class="setup-preview-box">
+      ① まず上の <b>world enemy</b> または <b>獣王</b> を選択してください。
+    </div>
+
+    <div class="setup-footer-btns">
+      <button type="button" id="yajuCancelBossSetupBtn" class="action-btn secondary" style="flex:0.7;">戻る</button>
+      <button type="button" id="yajuBossStartBtn" class="action-btn" disabled style="flex:1.3;">ボス戦スタート</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE リザルトオーバーレイ -->
+<div id="yajuEndOverlay" class="yaju-end-overlay hidden">
+  <div class="modal-panel" style="text-align:center;">
+    <div id="yajuEndEyebrow" class="eyebrow">YAJUMAZE</div>
+    <h1 id="yajuEndTitle">STAGE CLEAR</h1>
+    <p id="yajuEndText" class="modal-sub" style="font-size:14px;color:#eaf8ff;margin-top:8px;"></p>
+    <div id="yajuEndButtons" class="yaju-setup-btns" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<audio id="bgm-yarimasune" src="./assets/sounds/yarimasune.mp3" loop></audio>
+<audio id="se-provoke" src="./assets/sounds/114514.mp3"></audio>
+<audio id="se-boom" src="./assets/sounds/boom.mp3"></audio>
+<audio id="se-start" src="./assets/sounds/start.mp3"></audio>
+<audio id="se-totugeki" src="./assets/sounds/totugeki.mp3"></audio>
+<audio id="se-restart" src="./assets/sounds/restart.mp3"></audio>
+<audio id="se-clear" src="./assets/sounds/clear.mp3"></audio>
 
 <script type="module" src="js/app.js"></script>
 </body>

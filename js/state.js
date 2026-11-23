@@ -24,6 +24,7 @@ export const state = {
   score: 0,
   earnedGoldInMatch: 0,
   gold: 0,
+  yajuCoins: 0,
 
   yaw: 0,
   pitch: -0.05,
@@ -46,6 +47,8 @@ export const state = {
 
   selectedBattleMode: null,
   selectedDifficultyId: null,
+  selectedYajuBossId: null,
+  selectedYajuDiffId: null,
   activeBattleMode: 'FALL_MISSILE',
   activeDifficulty: CONFIG.DIFFICULTIES[0],
   airStrikeState: null
@@ -161,6 +164,12 @@ export function loadGameData(){
     if(!Number.isNaN(parsedGold)) state.gold = parsedGold;
   }
 
+  const savedYajuCoins = localStorage.getItem('spaa_yaju_coins');
+  if(savedYajuCoins !== null){
+    const parsedCoins = parseInt(savedYajuCoins, 10);
+    if(!Number.isNaN(parsedCoins)) state.yajuCoins = parsedCoins;
+  }
+
   const savedUnlocked = localStorage.getItem('spaa_unlocked_skins');
   if(savedUnlocked){
     try{
@@ -198,6 +207,7 @@ export function loadGameData(){
 export function saveGameData(){
   localStorage.setItem('spaa_username', state.username);
   localStorage.setItem('spaa_gold', String(state.gold));
+  localStorage.setItem('spaa_yaju_coins', String(state.yajuCoins || 0));
   localStorage.setItem('spaa_unlocked_skins', JSON.stringify(state.unlockedSkins));
   localStorage.setItem('spaa_selected_skin', state.selectedSkinId);
   localStorage.setItem('spaa_skin_upgrades', JSON.stringify(state.skinUpgrades));

@@ -1,4 +1,5 @@
 import { CONFIG } from './config.js';
+import { YAJU_BOSSES, YAJU_BOSS_DIFFICULTIES, YAJU_REWARDS } from './yaju-config.js';
 import { state, getSkinUpgrade, getEquippedSkin, getEffectiveStats, getDifficultyById, saveGameData } from './state.js';
 import { $, setModeUI, updateHoldGauge } from './ui.js';
 import { resetMovementInputs } from './controls.js';
@@ -16,7 +17,9 @@ export function closeAllModals(){
     '#usernameModal',
     '#battleSetupModal',
     '#coopWaitModal',
-    '#coopInviteModal'
+    '#coopInviteModal',
+    '#yajuSetupModal',
+    '#yajuBossSetupModal'
   ];
   modals.forEach(id => {
     const el = $(id);
@@ -425,4 +428,85 @@ export function renderSkinStoreList(){
 
 export function getSelectedDiffObj(){
   return getDifficultyById(state.selectedDifficultyId);
+}
+
+
+export function openYajuSetupModal(){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  $('#yajuSetupModal')?.classList.add('visible');
+}
+
+export function openYajuBossSetupModal(){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  state.selectedYajuBossId = null;
+  state.selectedYajuDiffId = null;
+  renderYajuBossSetupModal();
+  $('#yajuBossSetupModal')?.classList.add('visible');
+}
+
+export function renderYajuBossSetupModal(){
+  const bossGrid = $('#yajuBossBtnGrid');
+  if(bossGrid){
+    bossGrid.innerHTML = '';
+    YAJU_BOSSES.forEach(boss => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'setup-mode-btn' + (state.selectedYajuBossId === boss.id ? ' selected' : '');
+      btn.innerHTML = `<strong>${boss.name}</strong><span>${boss.desc}</span>`;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        state.selectedYajuBossId = boss.id;
+        renderYajuBossSetupModal();
+      });
+      bossGrid.appendChild(btn);
+    });
+  }
+
+  const bossChosen = !!state.selectedYajuBossId;
+  const hint = $('#yajuDiffLockHint');
+  if(hint){
+    hint.textContent = bossChosen
+      ? '（難易度を選択してください）'
+      : '（※先にボスを選択してください）';
+  }
+
+  const diffGrid = $('#yajuBossDiffGrid');
+  if(diffGrid){
+    diffGrid.innerHTML = '';
+    YAJU_BOSS_DIFFICULTIES.forEach(diff => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'setup-diff-btn' + (state.selectedYajuDiffId === diff.id ? ' selected' : '');
+      btn.disabled = !bossChosen;
+      btn.innerHTML = `<span>${diff.name}</span><span style="font-size:10px;color:#ffd23f;">HP:${diff.hp} / ${diff.atkMult.toFixed(1)}倍</span>`;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if(!state.selectedYajuBossId) return;
+        state.selectedYajuDiffId = diff.id;
+        renderYajuBossSetupModal();
+      });
+      diffGrid.appendChild(btn);
+    });
+  }
+
+  const bossObj = YAJU_BOSSES.find(b => b.id === state.selectedYajuBossId);
+  const diffObj = YAJU_BOSS_DIFFICULTIES.find(d => d.id === state.selectedYajuDiffId);
+  const startBtn = $('#yajuBossStartBtn');
+  if(startBtn) startBtn.disabled = !(bossObj && diffObj);
+
+  const preview = $('#yajuBossPreviewBox');
+  if(preview){
+    if(!bossObj){
+      preview.innerHTML = '① まず上の <b>world enemy</b> または <b>獣王</b> を選択してください。';
+    } else if(!diffObj){
+      preview.innerHTML = `選択中ボス: <b>${bossObj.name}</b><br>② 次に難易度（イージー〜INSANE）を選択してください。`;
+    } else {
+      const rewardCoins = Math.round(YAJU_REWARDS.BOSS_BASE_COINS * diffObj.atkMult);
+      preview.innerHTML = `<b>【${bossObj.name}】 ${diffObj.name}</b><br>ボス体力: <b>${diffObj.hp}</b> / 敵攻撃力倍率: <b>${diffObj.atkMult.toFixed(1)}倍</b><br>討伐報酬: <b>YAJUコイン +${rewardCoins}枚</b>`;
+    }
+  }
 }

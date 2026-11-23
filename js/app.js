@@ -9,12 +9,14 @@ import {
 import { initInputControls, resetMovementInputs } from './controls.js';
 import {
   closeAllModals, openCoopModal, openBattleSetupModal, renderBattleSetupModal,
-  openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal
+  openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal,
+  openYajuSetupModal, openYajuBossSetupModal
 } from './modals.js';
-import { resetCombatState } from './player.js';
+import { resetCombatState, updateCombatSystem } from './player.js';
 import { clearEnemiesAndFx, updateEnemiesAndWave } from './enemies.js';
 import { initFallMissileMode, updateFallMissileMode } from './mode-fall-missile.js';
 import { initAirStrikeMode, updateAirStrikeMode, generateAirStrikeMissionData } from './mode-air-strike.js';
+import { resetYajuState, updateYajuMazeMode, startYajuNormalMode, startYajuBossMode, bindYajuCallbacks } from './mode-yaju-maze.js';
 import { buildHomeWorld } from './map-home.js';
 import { buildSkinWorld } from './map-skin.js';
 import { buildWorld, normalizeModel } from './map-fall-missile.js';
@@ -55,6 +57,7 @@ export function enterHome(){
   hideEndScreen();
   closeAllModals();
 
+  resetYajuState();
   // バトル用のキャッシュ・状態・ソロ一時切替フラグを完全クリア
   coopState.battleSoloOverride = false;
   resetCoopMatchFlags();
@@ -77,7 +80,7 @@ export function enterHome(){
   updateHoldGauge(0);
 
   clearScene();
-  state.homeController = buildHomeWorld(T, state.scene);
+  state.homeController = buildHomeWorld(T, state.scene, state.gold, state.yajuCoins);
 
   if(coopState.isCoop){
     createRemotePlayerMesh();
@@ -182,6 +185,11 @@ bindMultiplayerCallbacks({
   startBattle,
   enterHome,
   finishBattle
+});
+
+bindYajuCallbacks({
+  enterHome,
+  openBossSetup: openYajuBossSetupModal
 });
 
 async function load3DAssets(){
@@ -314,6 +322,9 @@ function loop(now){
       if(hit === 'battle'){
         state.triggerCooldown = 45;
         openBattleSetupModal();
+      } else if(hit === 'yaju'){
+        state.triggerCooldown = 45;
+        openYajuSetupModal();
       } else if(hit === 'skin'){
         enterSkinRoom();
       } else if(hit === 'coop'){
@@ -354,6 +365,11 @@ function loop(now){
       updateEnemiesAndWave(dt, effectiveCtx, finishBattle);
     } else if(state.activeBattleMode === 'AIR_STRIKE'){
       updateAirStrikeMode(dt, effectiveCtx, finishBattle);
+    } else if(state.activeBattleMode === 'YAJU_MAZE' || state.activeBattleMode === 'YAJU_BOSS' || state.activeBattleMode === 'YAJU_DEAD'){
+      updateYajuMazeMode(dt);
+      if(state.activeBattleMode === 'YAJU_BOSS'){
+        updateCombatSystem(dt, {});
+      }
     }
   }
 
@@ -564,4 +580,39 @@ $('#chatInput')?.addEventListener('keydown', (e) => {
     e.preventDefault();
     sendGlobalChatMessage();
   }
+});
+
+
+// YAJUMAZE 設定・ボス戦モーダル
+$('#yajuStartNormalBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const compass = !!$('#yajuSettingCompass')?.checked;
+  const progressiveEnemies = !!$('#yajuSettingProgressive')?.checked;
+  closeAllModals();
+  startYajuNormalMode({ compass, progressiveEnemies });
+});
+
+$('#yajuOpenBossSetupBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  openYajuBossSetupModal();
+});
+
+$('#yajuCancelSetupBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  closeAllModals();
+  state.triggerCooldown = 45;
+});
+
+$('#yajuCancelBossSetupBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  openYajuSetupModal();
+});
+
+$('#yajuBossStartBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if(!state.selectedYajuBossId || !state.selectedYajuDiffId) return;
+  const bossId = state.selectedYajuBossId;
+  const diffId = state.selectedYajuDiffId;
+  closeAllModals();
+  startYajuBossMode(bossId, diffId);
 });

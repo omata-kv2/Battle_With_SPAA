@@ -645,3 +645,139 @@ h1{font-size:clamp(34px,7vw,56px);font-weight:900;line-height:1.05;margin-bottom
 }
 .buy-btn:disabled{opacity:.4;cursor:not-allowed}
 .result-actions{display:flex;flex-direction:column;gap:10px;width:min(300px,80vw);margin-top:18px}
+
+/* ==========================================
+   YAJUMAZE / BOSS MODE UI
+   ========================================== */
+#yajuHud{position:fixed;inset:0;pointer-events:none;z-index:12}
+.yaju-hud-top{
+  display:flex;justify-content:flex-start;align-items:flex-start;gap:10px;
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 12px 68px;
+  position:relative;z-index:14;
+}
+.yaju-panel{
+  background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.2);
+  border-radius:10px;padding:7px 10px;min-width:128px;
+}
+.yaju-hud-label{font-size:10px;letter-spacing:.14em;color:#c8c5b6;margin-bottom:4px}
+.yaju-meter{height:8px;background:#39392f;border-radius:8px;overflow:hidden}
+#yajuStaminaFill{height:100%;width:100%;background:#82c78c;transition:width .12s linear}
+#yajuStaminaText,#yajuHpText{font-size:11px;margin-top:4px;text-align:right;color:#eaf8ff}
+#yajuHpFill{height:100%;width:100%;background:#e74c3c;transition:width .12s linear}
+.yaju-status-panel{min-width:110px;text-align:center}
+#yajuFloorDisplay{font-size:13px;font-weight:800;color:#ffd23f}
+
+.yaju-top-right-slot{
+  position:relative;margin-left:auto;display:flex;align-items:flex-start;justify-content:flex-end;min-width:130px;
+}
+.yaju-compass-container{display:flex;gap:10px}
+.yaju-compass-wrapper{display:flex;flex-direction:column;align-items:center}
+.yaju-compass-label{font-size:11px;font-weight:800;letter-spacing:.08em;margin-bottom:3px;color:#f4f0df;text-shadow:0 1px 3px #000}
+.yaju-compass-circle{
+  position:relative;width:52px;height:52px;border-radius:50%;
+  border:3px solid #82c78c;background:rgba(0,0,0,.62);
+  display:flex;justify-content:center;align-items:center;pointer-events:none;
+  transition:border-color .2s ease;
+}
+.yaju-needle{
+  position:absolute;bottom:50%;left:50%;width:2px;height:21px;
+  transform-origin:bottom center;transform:translateX(-50%) rotate(0deg);transition:transform .1s;
+}
+.yaju-distance-text{position:absolute;font-size:10px;font-weight:800;color:#fff;z-index:2;text-shadow:0 1px 2px #000}
+.yaju-boss-hp-panel{
+  min-width:165px;background:rgba(28,0,0,.82);border:1px solid rgba(255,80,80,.6);
+}
+#yajuBossHpFill{height:100%;width:100%;background:#ff2e2e;transition:width .12s linear}
+#yajuBossHpText{font-size:11px;margin-top:4px;text-align:right;color:#ffcccc;font-weight:800}
+
+#yajuRocketHud{
+  position:fixed;right:-40px;bottom:-40px;width:150px;height:150px;
+  object-fit:contain;transform:rotate(-50deg);z-index:1;pointer-events:none;opacity:.85;
+}
+
+.yaju-message{
+  position:fixed;left:50%;bottom:135px;transform:translateX(-50%);
+  padding:7px 14px;background:rgba(0,0,0,.78);border:1px solid rgba(255,255,255,.22);
+  border-radius:8px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;
+  opacity:0;transition:opacity .25s;z-index:15;pointer-events:none;
+}
+
+/* 画面右端中央の小型丸型ロケット発射ボタン */
+.yaju-rocket-btn{
+  position:fixed;
+  right:max(14px,env(safe-area-inset-right));
+  top:50%;
+  transform:translateY(-50%);
+  width:54px;height:54px;border-radius:50%;
+  border:2px solid #ff9233;
+  background:radial-gradient(circle at 30% 30%,rgba(255,107,53,.88),rgba(46,14,6,.95));
+  color:#fff;font-weight:900;font-size:11px;line-height:1.15;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(255,107,53,.55);
+  pointer-events:auto;cursor:pointer;z-index:19;touch-action:manipulation;
+}
+.yaju-rocket-count{font-size:10px;color:#ffd23f}
+#explosionChargeMeter.yaju-rocket-offset{
+  right:calc(max(14px,env(safe-area-inset-right)) + 64px);
+}
+
+.yaju-controls{
+  position:fixed;right:max(18px,env(safe-area-inset-right));bottom:max(22px,env(safe-area-inset-bottom));
+  pointer-events:none;z-index:15;
+}
+.yaju-action-buttons{
+  display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none;
+}
+.yaju-btn-action{
+  min-width:84px;min-height:48px;padding:8px 14px;font-size:14px;font-weight:800;
+  border:none;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.45);
+  pointer-events:auto;cursor:pointer;touch-action:manipulation;
+}
+.yaju-btn-sprint{background:#d7cda8;color:#171713}
+.yaju-dash-wrapper{position:relative;display:inline-block;pointer-events:auto}
+.yaju-btn-dash{background:#3498db;color:#fff;width:84px;height:48px;position:relative;z-index:1}
+.yaju-btn-dash:disabled{background:#555;color:#aaa;cursor:not-allowed}
+.yaju-dash-cd-ring{
+  position:absolute;top:-4px;left:-4px;width:92px;height:56px;pointer-events:none;z-index:2;
+}
+.yaju-ring-bg{fill:none;stroke:rgba(255,255,255,.15);stroke-width:3.5}
+.yaju-ring-fill{
+  fill:none;stroke:#00e5ff;stroke-width:3.5;stroke-linecap:round;
+  transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dasharray .1s linear;
+}
+/* ボス戦時は右下の通常攻撃ボタンと重ならないよう左に配置 */
+body.yaju-boss-active .yaju-controls,
+#yajuHud:has(#yajuBossHpPanel:not(.hidden)) .yaju-controls{
+  right:calc(max(22px,env(safe-area-inset-right)) + 108px);
+}
+
+/* YAJUMAZE 設定モーダル & スライドボタン */
+.yaju-modal-title{
+  font-size:clamp(32px,6vw,44px);font-weight:900;letter-spacing:.08em;
+  color:#ff4d6d;text-shadow:0 0 18px rgba(255,77,109,.45);margin:4px 0 8px;
+}
+.yaju-settings-group{
+  background:rgba(6,19,31,.8);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;margin:12px 0 16px;
+}
+.yaju-toggle-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;font-size:14px;font-weight:700;color:var(--text);
+}
+.yaju-switch{position:relative;display:inline-block;width:46px;height:24px}
+.yaju-switch input{opacity:0;width:0;height:0}
+.yaju-slider{
+  position:absolute;cursor:pointer;inset:0;background:#355066;transition:.25s;border-radius:24px;
+}
+.yaju-slider:before{
+  position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;
+  background:#fff;transition:.25s;border-radius:50%;
+}
+.yaju-switch input:checked + .yaju-slider{background:#ff4d6d}
+.yaju-switch input:checked + .yaju-slider:before{transform:translateX(22px)}
+.yaju-setup-btns{display:flex;flex-direction:column;gap:8px}
+
+.yaju-end-overlay{
+  position:fixed;inset:0;z-index:75;display:flex;align-items:center;justify-content:center;
+  background:rgba(3,10,18,.86);backdrop-filter:blur(6px);padding:20px;
+}

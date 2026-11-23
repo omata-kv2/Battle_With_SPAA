@@ -1,4 +1,4 @@
-export function buildHomeWorld(T, scene){
+export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
   scene.background = new T.Color(0x0b1f33);
   scene.fog = new T.FogExp2(0x0b1f33, 0.008);
 
@@ -31,6 +31,43 @@ export function buildHomeWorld(T, scene){
     w.position.set(wc.x, wc.y, wc.z);
     scene.add(w);
   }
+
+  function createCurrencyPanel(text, borderHex, textColor, yPos){
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const font = 'bold 40px sans-serif';
+    ctx.font = font;
+    const measured = ctx.measureText(text).width;
+    const w = Math.max(380, Math.ceil(measured + 88));
+    const h = 96;
+    canvas.width = w;
+    canvas.height = h;
+
+    ctx.fillStyle = 'rgba(7, 21, 34, 0.90)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = borderHex;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
+
+    ctx.font = font;
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, w / 2, h / 2);
+
+    const tex = new T.CanvasTexture(canvas);
+    tex.colorSpace = T.SRGBColorSpace;
+    const sprite = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true }));
+    const worldH = 1.05;
+    const worldW = (w / h) * worldH;
+    sprite.scale.set(worldW, worldH, 1);
+    sprite.position.set(0, yPos, -6.5);
+    scene.add(sprite);
+    return sprite;
+  }
+
+  createCurrencyPanel(`Gold: ${Number(gold || 0).toLocaleString()} G`, '#ffd23f', '#ffd23f', 5.05);
+  createCurrencyPanel(`YAJUコイン: ${Number(yajuCoins || 0).toLocaleString()}枚`, '#ff4d6d', '#ff9ebb', 6.30);
 
   function createPortal(title, subtitle, colorHex, x, z, isCoopGate = false){
     const group = new T.Group();
@@ -98,17 +135,20 @@ export function buildHomeWorld(T, scene){
   }
 
   const battlePortal = createPortal('出撃ゲート', 'モード・難易度を選択して出撃', 0x00f5d4, 0, -11);
+  const yajuPortal = createPortal('YAJUMAZE', '迷路脱出＆ボス挑戦', 0xff4d6d, 6.8, -11);
   const skinPortal = createPortal('機体格納庫', '機体選択・強化・ショップへ', 0xff9233, 11, 0);
   const coopPortal = createPortal('フレンド共闘', 'ルーム作成・参加で2人共闘', 0x38c8f0, -11, 0, true);
 
   return {
     update(tick){
       battlePortal.curtain.material.opacity = 0.2 + Math.sin(tick * 0.06) * 0.08;
+      yajuPortal.curtain.material.opacity = 0.2 + Math.sin(tick * 0.06 + 0.6) * 0.08;
       skinPortal.curtain.material.opacity = 0.2 + Math.cos(tick * 0.06) * 0.08;
       coopPortal.curtain.material.opacity = 0.2 + Math.sin(tick * 0.06 + 1.2) * 0.08;
     },
     checkPortal(px, pz){
       if(Math.hypot(px - battlePortal.x, pz - battlePortal.z) < battlePortal.radius) return 'battle';
+      if(Math.hypot(px - yajuPortal.x, pz - yajuPortal.z) < yajuPortal.radius) return 'yaju';
       if(Math.hypot(px - skinPortal.x, pz - skinPortal.z) < skinPortal.radius) return 'skin';
       if(Math.hypot(px - coopPortal.x, pz - coopPortal.z) < coopPortal.radius) return 'coop';
       return null;

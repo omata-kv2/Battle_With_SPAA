@@ -156,6 +156,8 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'battle'){
     if(banner) banner.classList.add('hidden-mode');
+    const skillBtn = $('#skillBtn');
+    if(skillBtn) skillBtn.classList.remove('hidden-mode');
     battleEls.forEach(el => el.classList.remove('hidden-mode'));
     if(battleMode === 'AIR_STRIKE'){
       showExplosionChargeMeter(false);
@@ -165,7 +167,23 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
       $('#stat1Label').textContent = 'ALTITUDE';
       $('#stat2Label').textContent = 'SURVIVED';
       $('#stat3Label').textContent = 'SCORE';
+    } else if(battleMode === 'YAJU_MAZE' || battleMode === 'YAJU_DEAD'){
+      showExplosionChargeMeter(false);
+      battleEls.forEach(el => el.classList.add('hidden-mode'));
+      const stickEl = $('#stick');
+      if(stickEl) stickEl.classList.toggle('hidden-mode', battleMode === 'YAJU_DEAD');
+    } else if(battleMode === 'YAJU_BOSS'){
+      const stickEl = $('#stick');
+      if(stickEl) stickEl.classList.remove('hidden-mode');
+      const headerEl = $('header.battle-only');
+      const announceEl = $('#announce');
+      if(headerEl) headerEl.classList.add('hidden-mode');
+      if(announceEl) announceEl.classList.add('hidden-mode');
+      if(skillBtn) skillBtn.classList.add('hidden-mode');
+      showExplosionChargeMeter(skin && skin.attackType === 'explosion');
     } else {
+      const stickEl = $('#stick');
+      if(stickEl) stickEl.classList.remove('hidden-mode');
       showExplosionChargeMeter(skin && skin.attackType === 'explosion');
       $('#stat1Label').textContent = 'WAVE';
       $('#stat2Label').textContent = 'TARGETS';

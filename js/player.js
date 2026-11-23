@@ -6,6 +6,21 @@ import {
   showExplosionChargeMeter, updateExplosionChargeMeter
 } from './ui.js';
 import { applyEnemyDamage, burst, burstWhiteStrong } from './enemies.js';
+import { getYajuTargetMeshes, applyYajuPlayerDamage } from './mode-yaju-maze.js';
+
+function isCombatActiveMode(){
+  return state.gameMode === 'battle' && (state.activeBattleMode === 'FALL_MISSILE' || state.activeBattleMode === 'YAJU_BOSS');
+}
+
+function getCombatEnemies(){
+  return state.activeBattleMode === 'YAJU_BOSS' ? getYajuTargetMeshes() : state.enemies;
+}
+
+function getTargetWorldPos(obj){
+  const v = new T.Vector3();
+  if(obj && obj.getWorldPosition) obj.getWorldPosition(v);
+  return v;
+}
 
 const pendingShotTimers = new Set();
 
@@ -263,7 +278,7 @@ function deployNextLaserTurret(coopCtx = {}){
 }
 
 export function spawnRemoteLaserTurret(x, z, mkNumber){
-  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  if(!state.scene || !isCombatActiveMode()) return;
   const { group, apexOrb, apexWorld } = createLaserPyramidTurretMesh(x, z, mkNumber, '僚機 ');
   combatState.remoteLaserState.turrets.push({
     mkNumber,
@@ -306,7 +321,7 @@ function removeLaserBeamMeshForTurret(lt){
 }
 
 export function updateRemoteLaserBeams(activeBeams){
-  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  if(!state.scene || !isCombatActiveMode()) return;
   const activeMap = new Map();
   for(const b of (activeBeams || [])){
     activeMap.set(b.mkNumber, b);
@@ -344,7 +359,8 @@ function getCrosshairAimPoint(){
   let bestEnemyPos = null;
   let bestDistAlong = Infinity;
 
-  for(const e of state.enemies){
+  const _enemies = getCombatEnemies();
+  for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     const perpDist = ray.ray.distanceToPoint(c);
@@ -371,7 +387,8 @@ function applyTurretLaserContactDamage(lt, aimPt, radiusMult, coopCtx){
   const closestPt = new T.Vector3();
   const targetsHit = [];
 
-  for(const e of state.enemies){
+  const _enemies = getCombatEnemies();
+  for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     lineSeg.closestPointToPoint(c, true, closestPt);
@@ -381,13 +398,13 @@ function applyTurretLaserContactDamage(lt, aimPt, radiusMult, coopCtx){
   }
 
   for(const hitEn of targetsHit){
-    if(!state.enemies.includes(hitEn)) continue;
+    if(!_enemies.includes(hitEn)) continue;
     dealHitToEnemy(hitEn, eff.atk, 0xff4d6d, eff.scoreMult, coopCtx, false);
   }
 }
 
 function triggerLaserTurretAttack(mkNumber, coopCtx = {}){
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+  if(!isCombatActiveMode() || state.modalOpen) return;
   const ds = combatState.laserDeployState;
   if(!ds.isDeployedComplete) return;
 
@@ -407,6 +424,13 @@ function triggerLaserTurretAttack(mkNumber, coopCtx = {}){
 }
 
 function dealHitToEnemy(enemyObj, dmg, beamColor, scoreMult, coopCtx, strongWhiteFx = false){
+  if(state.activeBattleMode === 'YAJU_BOSS'){
+    const hitPos = getTargetWorldPos(enemyObj);
+    if(strongWhiteFx) burstWhiteStrong(hitPos);
+    else burst(hitPos, beamColor);
+    applyYajuPlayerDamage(enemyObj, dmg);
+    return;
+  }
   if(coopCtx.isCoop && !coopCtx.isHost){
     if(strongWhiteFx) burstWhiteStrong(enemyObj.position);
     else burst(enemyObj.position, beamColor);
@@ -505,7 +529,7 @@ function spawnAdditionalTurrets(turretCount, durationSec, playerAtk, playerFireR
 }
 
 export function spawnRemoteRapidTurrets(positions, durationSec){
-  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  if(!state.scene || !isCombatActiveMode()) return;
   for(const oldRt of combatState.remoteTurrets){
     if(oldRt.mesh && state.scene) state.scene.remove(oldRt.mesh);
   }
@@ -539,7 +563,7 @@ function destroyTargetsList(targetsToDestroy, beamColor, eff, coopCtx){
 }
 
 export function activateUnitSkill(coopCtx = {}){
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+  if(!isCombatActiveMode() || state.modalOpen) return;
   if(combatState.skillCooldownTimer > 0 || combatState.skillActiveTimer > 0) return;
 
   const skin = getEquippedSkin();
@@ -747,7 +771,7 @@ export function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0x
 }
 
 export function fireSingleBeam(skin, effectiveStats, spreadYaw = 0, spreadPitch = 0, overrideDmg = null, overrideRadius = null, customOrigin = null, strongWhiteFx = false, coopCtx = {}){
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return null;
+  if(!isCombatActiveMode() || state.modalOpen) return null;
 
   const d = new T.Vector3();
   state.camera.getWorldDirection(d);
@@ -766,14 +790,15 @@ export function fireSingleBeam(skin, effectiveStats, spreadYaw = 0, spreadPitch 
 
   const ray = new T.Raycaster(rayOrigin, d, 0, 125);
   let hit = null, best = Infinity;
-  for(const e of state.enemies){
+  const _enemies = getCombatEnemies();
+  for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     const dist = ray.ray.distanceToPoint(c), along = rayOrigin.distanceTo(c);
     if(dist < hitRadius && along < best){ hit = e; best = along; }
   }
 
-  const endPt = hit ? hit.position.clone() : rayOrigin.clone().add(d.clone().multiplyScalar(55));
+  const endPt = hit ? getTargetWorldPos(hit) : rayOrigin.clone().add(d.clone().multiplyScalar(55));
   const beamRadiusScale = Math.max(0.85, hitRadius / 2.4);
   spawnShortGradientProjectile(visualOrigin, endPt, beamColor, beamRadiusScale, coopCtx);
 
@@ -816,7 +841,7 @@ export function releaseExplosionCharge(coopCtx = {}){
   updateChargeGauge(0);
   updateExplosionChargeMeter(0, false, false, eff.bonusBlastRadiusM);
 
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+  if(!isCombatActiveMode() || state.modalOpen) return;
   if(skin.attackType !== 'explosion') return;
 
   // 最小単位0.1秒として、秒数(0.1秒ごと増やす) × 5(定数) + アップグレード加算分
@@ -835,22 +860,23 @@ function executeExplosionAttack(skin, eff, totalRadiusM, coopCtx){
 
   const ray = new T.Raycaster(rayOrigin, d, 0, 130);
   let hit = null, best = Infinity;
-  for(const e of state.enemies){
+  const _enemies = getCombatEnemies();
+  for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     const dist = ray.ray.distanceToPoint(c), along = rayOrigin.distanceTo(c);
     if(dist < skin.stats.beamRadius && along < best){ hit = e; best = along; }
   }
 
-  const impactPt = hit ? hit.position.clone() : rayOrigin.clone().add(d.clone().multiplyScalar(52));
+  const impactPt = hit ? getTargetWorldPos(hit) : rayOrigin.clone().add(d.clone().multiplyScalar(52));
   spawnShortGradientProjectile(visualOrigin, impactPt, beamColor, 1.35, coopCtx);
 
   const blastWorldRadius = Math.max(0.85, totalRadiusM * 1.45);
   spawnDetonationEffect(impactPt, blastWorldRadius, beamColor, coopCtx);
 
-  const affected = state.enemies.filter(e => e === hit || e.position.distanceTo(impactPt) <= blastWorldRadius);
+  const affected = _enemies.filter(e => e === hit || getTargetWorldPos(e).distanceTo(impactPt) <= blastWorldRadius);
   for(const targetEn of affected){
-    if(!state.enemies.includes(targetEn)) continue;
+    if(!_enemies.includes(targetEn)) continue;
     dealHitToEnemy(targetEn, eff.atk, beamColor, eff.scoreMult, coopCtx, false);
   }
 }
@@ -905,7 +931,7 @@ function spawnAutomaticProjectilesFromData(origin, launchDirs, targetIds, isFigh
 }
 
 export function spawnRemoteAutomaticVolley(payload){
-  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  if(!state.scene || !isCombatActiveMode()) return;
   const origin = new T.Vector3(payload.ox, payload.oy, payload.oz);
   const dirs = (payload.dirs || []).map(d => new T.Vector3(d.x, d.y, d.z));
   spawnAutomaticProjectilesFromData(origin, dirs, payload.targetIds || [], !!payload.isFighterPriority, 0);
@@ -925,7 +951,7 @@ function executeAutomaticVolley(skin, eff, coopCtx = {}){
 
   const origin = state.camera.position.clone().addScaledVector(forward, 0.85).addScaledVector(camUp, -0.18);
 
-  const sortedEnemies = [...state.enemies].sort((a, b) => {
+  const sortedEnemies = [...getCombatEnemies()].sort((a, b) => {
     if(isMultiBurst){
       const aF = a.userData.kind === 'fighter' ? 0 : 1;
       const bF = b.userData.kind === 'fighter' ? 0 : 1;
@@ -994,13 +1020,14 @@ function updateHomingProjectiles(dt, eff, coopCtx){
       continue;
     }
 
-    if(!p.targetEnemy || !state.enemies.includes(p.targetEnemy)){
+    const _curEnemies = getCombatEnemies();
+    if(!p.targetEnemy || !_curEnemies.includes(p.targetEnemy)){
       const otherTargeted = new Set(
         combatState.homingProjectiles
-          .filter(other => other !== p && other.targetEnemy && state.enemies.includes(other.targetEnemy))
+          .filter(other => other !== p && other.targetEnemy && _curEnemies.includes(other.targetEnemy))
           .map(other => other.targetEnemy.userData.id)
       );
-      const candidates = [...state.enemies].sort((a, b) => {
+      const candidates = [..._curEnemies].sort((a, b) => {
         if(p.isFighterPriority){
           const aF = a.userData.kind === 'fighter' ? 0 : 1;
           const bF = b.userData.kind === 'fighter' ? 0 : 1;
@@ -1012,7 +1039,7 @@ function updateHomingProjectiles(dt, eff, coopCtx){
     }
 
     const speed = 38.0;
-    if(p.targetEnemy && state.enemies.includes(p.targetEnemy)){
+    if(p.targetEnemy && _curEnemies.includes(p.targetEnemy)){
       const targetCenter = new T.Vector3();
       new T.Box3().setFromObject(p.targetEnemy).getCenter(targetCenter);
       const desiredDir = targetCenter.clone().sub(p.pos).normalize();
@@ -1054,7 +1081,8 @@ function fireTurretHomingPulse(apexOrigin, turretAtk, eff, coopCtx){
 
   let bestEnemy = null;
   let bestScore = Infinity;
-  for(const e of state.enemies){
+  const _enemies = getCombatEnemies();
+  for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
     const dist = apexOrigin.distanceTo(c);
@@ -1104,7 +1132,7 @@ function executeWirbelwindAttack(skin, eff, coopCtx){
     const spreadP = s === 0 ? 0 : (((s % 3) - 1) * 0.015);
     const tid = setTimeout(() => {
       pendingShotTimers.delete(tid);
-      if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+      if(!isCombatActiveMode()) return;
       for(const vOrigin of vertices){
         fireSingleBeam(skin, eff, spreadY, spreadP, eff.atk, skin.stats.beamRadius, vOrigin, false, coopCtx);
       }
@@ -1132,7 +1160,7 @@ function executeBeastAttack(skin, eff, coopCtx){
 }
 
 export function shoot(coopCtx = {}){
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+  if(!isCombatActiveMode() || state.modalOpen) return;
   const skin = getEquippedSkin();
   const effectiveStats = getEffectiveStats(skin);
 
@@ -1182,7 +1210,7 @@ export function shoot(coopCtx = {}){
     const pitchOffset = ((i % 3) - 1) * 0.025;
     const tid = setTimeout(() => {
       pendingShotTimers.delete(tid);
-      if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+      if(!isCombatActiveMode()) return;
       fireSingleBeam(skin, effectiveStats, angleOffset, pitchOffset, null, null, null, false, coopCtx);
     }, i * 85);
     pendingShotTimers.add(tid);
@@ -1190,7 +1218,7 @@ export function shoot(coopCtx = {}){
 }
 
 export function updateCombatSystem(dt, coopCtx = {}){
-  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  if(!isCombatActiveMode()) return;
 
   const skin = getEquippedSkin();
   const eff = getEffectiveStats(skin);
