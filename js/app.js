@@ -1,5 +1,5 @@
 import * as T from './libs/three.module.js';
-import { GLTFLoader } from './libs/GLTFLoader.js';
+import { GLTFLoader } from './libs/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from './config.js';
 import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData } from './state.js';
 import {
