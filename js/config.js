@@ -64,16 +64,16 @@ export const CONFIG = {
     },
     {
       id: 'Explosion', order: 3, name: 'Explosion', price: 6000, color: 0xff9233,
-      attackType: 'explosion', chargeTime: 1.5, baseBlastRadiusM: 1.0,
-      stats: { baseAtk: 8, baseRate: 1.0, scoreMult: 1.1, moveMult: 0.95, beamColor: 0xff9233, beamRadius: 3.0, desc: '1.5秒チャージで着弾点周囲をまとめて爆破する重砲機体。' },
+      attackType: 'explosion', chargeTime: 3.0, baseBlastRadiusM: 0,
+      stats: { baseAtk: 8, baseRate: 1.0, scoreMult: 1.1, moveMult: 0.95, beamColor: 0xff9233, beamRadius: 3.0, desc: '最大3.0秒チャージで爆発半径(秒数×5m・最大15m+強化分)が拡大し、離すと爆破する重砲機体。' },
       upgrades: [
         { key: 'atk', maxLv: 15 },
-        { key: 'blast', maxLv: 15 },
+        { key: 'blast', maxLv: 10 },
         { key: 'def', maxLv: 15 },
         { key: 'hp',  maxLv: 15 },
         { key: 'score',maxLv: 10 }
       ],
-      skill: { id: 'FewCharger', name: 'FewCharger', cooldown: 20, duration: 10, maxLv: 10, desc: '10秒間、チャージ必要時間を0.5〜1.4秒短縮する。' }
+      skill: { id: 'FewCharger', name: 'FewCharger', cooldown: 20, duration: 10, maxLv: 10, desc: '10秒間、最大3.0秒チャージまでの必要時間を0.5〜1.4秒短縮する。' }
     },
     {
       id: 'Scatter', order: 4, name: 'Scatter', price: 9000, color: 0x38c8f0,

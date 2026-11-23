@@ -100,7 +100,11 @@ export function getEffectiveStats(skin){
   const shotCount    = Math.max(1, Math.floor(rawRate) + saintShotBonus);
   const scoreMult    = skin.stats.scoreMult + (upg.score - 1) * 0.05 + gayScoreBonus;
 
-  const blastRadiusM = (skin.baseBlastRadiusM || 1.0) + (upg.blast - 1) * 0.2;
+  // Explosion 爆発範囲増加アップグレード: Lv.1(初期値)=0m 〜 Lv.10(最大)=+5.0m
+  const blastLvClamped = Math.max(1, Math.min(10, upg.blast || 1));
+  const bonusBlastRadiusM = Number(((blastLvClamped - 1) * (5 / 9)).toFixed(2));
+  const blastRadiusM = bonusBlastRadiusM;
+
   const laserDurationSec = Number(((skin.baseLaserDuration || 3.0) + (upg.duration - 1) * 0.2).toFixed(1));
   const autoVolleyCount = (skin.baseVolleyCount || 2) + (upg.volley - 1);
   const wirbelVertexShots = 1 + upg.vertexShots;
@@ -126,6 +130,7 @@ export function getEffectiveStats(skin){
     rawRate,
     shotCount,
     scoreMult,
+    bonusBlastRadiusM,
     blastRadiusM,
     laserDurationSec,
     autoVolleyCount,

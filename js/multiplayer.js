@@ -1,9 +1,15 @@
 import * as T from './libs/three.module.js';
-import { state, getEquippedSkin } from './state.js';
+import { CONFIG } from './config.js';
+import { state, getEquippedSkin, getDifficultyById } from './state.js';
 import { $, showToast, setModeUI, hud } from './ui.js';
 import { spawn } from './map-fall-missile.js';
 import { applyEnemyDamage, burst, getMaxWaves } from './enemies.js';
-import { createAirStrikePlayerActor, finalizeAirStrikeResult } from './mode-air-strike.js';
+import { createAirStrikePlayerActor, finalizeAirStrikeResult, generateAirStrikeMissionData } from './mode-air-strike.js';
+import { openCoopWaitModal, closeCoopWaitModal, openCoopInviteModal, closeCoopInviteModal } from './modals.js';
+import {
+  spawnShortGradientProjectile, spawnDetonationEffect, spawnRemoteRapidTurrets,
+  spawnRemoteLaserTurret, updateRemoteLaserBeams, spawnRemoteAutomaticVolley
+} from './player.js';
 
 export const coopState = {
   peer: null,
@@ -15,8 +21,22 @@ export const coopState = {
   remoteNameSprite: null,
   remoteCurrentName: '',
   remoteAirStrikeCraft: null,
-  remotePos: { x: 0, y: 0, z: 9, yaw: 0, username: '', airStrikePhase: 'countdown', airStrikeFinished: false },
-  coopStarting: false
+  remotePos: {
+    x: 0,
+    y: 0,
+    z: 9,
+    yaw: 0,
+    pitch: 0,
+    username: '',
+    airStrikePhase: 'countdown',
+    airStrikeFinished: false,
+    remoteSurvivedM: 0,
+    remoteHitTarget: false
+  },
+  // 出撃待機・参加要請・ソロ一時切替管理
+  pendingOutgoingInvite: null, // { mode, diffId, missionData }
+  pendingIncomingInvite: null, // { mode, diffId, missionData, senderName, fromHost }
+  battleSoloOverride: false
 };
 
 let appCallbacks = {
@@ -29,6 +49,15 @@ export function bindMultiplayerCallbacks(cbs){
   appCallbacks = { ...appCallbacks, ...cbs };
 }
 
+export function resetCoopMatchFlags(){
+  coopState.pendingOutgoingInvite = null;
+  coopState.pendingIncomingInvite = null;
+  coopState.remotePos.airStrikePhase = 'countdown';
+  coopState.remotePos.airStrikeFinished = false;
+  coopState.remotePos.remoteSurvivedM = 0;
+  coopState.remotePos.remoteHitTarget = false;
+}
+
 export function sendCoop(payload){
   if(coopState.conn && coopState.conn.open){
     coopState.conn.send(payload);
@@ -36,12 +65,104 @@ export function sendCoop(payload){
 }
 
 export function getCoopContext(){
+  const effectiveCoop = coopState.isCoop && !coopState.battleSoloOverride;
   return {
-    isCoop: coopState.isCoop,
-    isHost: coopState.isHost,
+    isCoop: effectiveCoop,
+    isHost: effectiveCoop ? coopState.isHost : false,
     remotePos: coopState.remotePos,
-    sendCoop
+    sendCoop: effectiveCoop ? sendCoop : null
   };
+}
+
+// 共闘中に出撃スタートボタンを押した際のフロー制御（待機・参加要請・被り時ホスト優先強制合流）
+export function initiateCoopBattleRequest(chosenMode, chosenDiffId, sharedMission){
+  if(!coopState.isCoop || !coopState.conn || !coopState.conn.open){
+    coopState.battleSoloOverride = false;
+    resetCoopMatchFlags();
+    if(appCallbacks.startBattle){
+      appCallbacks.startBattle(chosenMode, chosenDiffId, sharedMission);
+    }
+    return;
+  }
+
+  // すでに相手からの参加要請が届いている状態で自分もスタートを押した場合（被り発生！）
+  if(coopState.pendingIncomingInvite){
+    const incoming = coopState.pendingIncomingInvite;
+    coopState.pendingIncomingInvite = null;
+    closeCoopInviteModal();
+
+    if(coopState.isHost){
+      // 自分がホスト：ホスト側の設定を最優先し、相手（参加者）のマップをリセットさせて強制合流
+      coopState.battleSoloOverride = false;
+      resetCoopMatchFlags();
+      sendCoop({
+        type: 'forceMergeBattle',
+        mode: chosenMode,
+        diffId: chosenDiffId,
+        missionData: sharedMission
+      });
+      showToast('出撃が重なったため、ホスト側の設定で強制合流しました！');
+      if(appCallbacks.startBattle){
+        appCallbacks.startBattle(chosenMode, chosenDiffId, sharedMission);
+      }
+    } else {
+      // 自分が参加者（ゲスト）：自分が建てた設定・マップを破棄し、ホスト側のゲームへ強制合流
+      coopState.battleSoloOverride = false;
+      resetCoopMatchFlags();
+      sendCoop({ type: 'ackForceMerge' });
+      showToast('ホスト側のゲーム設定が優先されたため、ホストの戦場へ強制合流します！');
+      if(appCallbacks.startBattle){
+        appCallbacks.startBattle(incoming.mode, incoming.diffId, incoming.missionData);
+      }
+    }
+    return;
+  }
+
+  // 通常の待機開始＆相手へ参加要請を送信
+  coopState.battleSoloOverride = false;
+  coopState.pendingOutgoingInvite = {
+    mode: chosenMode,
+    diffId: chosenDiffId,
+    missionData: sharedMission
+  };
+  openCoopWaitModal(chosenMode, chosenDiffId);
+
+  sendCoop({
+    type: 'battleInvite',
+    mode: chosenMode,
+    diffId: chosenDiffId,
+    missionData: sharedMission,
+    senderName: state.username || (coopState.isHost ? 'ホスト' : 'ゲスト'),
+    fromHost: coopState.isHost
+  });
+}
+
+export function cancelOutgoingBattleInvite(){
+  if(!coopState.pendingOutgoingInvite) return;
+  coopState.pendingOutgoingInvite = null;
+  closeCoopWaitModal();
+  sendCoop({ type: 'battleInviteCancelled' });
+  showToast('出撃待機をキャンセルしました');
+}
+
+export function respondToBattleInvite(accept){
+  const inv = coopState.pendingIncomingInvite;
+  coopState.pendingIncomingInvite = null;
+  closeCoopInviteModal();
+
+  if(!inv) return;
+
+  if(accept){
+    coopState.battleSoloOverride = false;
+    resetCoopMatchFlags();
+    sendCoop({ type: 'battleInviteAccepted' });
+    if(appCallbacks.startBattle){
+      appCallbacks.startBattle(inv.mode, inv.diffId, inv.missionData);
+    }
+  } else {
+    sendCoop({ type: 'battleInviteDeclined' });
+    showToast('参加要請を拒否しました（相手はソロモードで出撃します）');
+  }
 }
 
 export function makeTextSprite(TModule, text, bgColor = 'rgba(10,30,45,0.85)', textColor = '#ffffff'){
@@ -151,6 +272,7 @@ function updateRemoteNameLabel(newName){
 
 export function syncCoopFrame(){
   if(!coopState.isCoop || !coopState.conn || !coopState.conn.open) return;
+  if(coopState.battleSoloOverride) return;
 
   if(state.gameMode === 'battle' && state.activeBattleMode === 'AIR_STRIKE'){
     if(state.syncTick % 2 === 0){
@@ -160,6 +282,7 @@ export function syncCoopFrame(){
         y: state.y,
         z: state.z,
         yaw: state.yaw,
+        pitch: state.pitch,
         username: state.username,
         airStrikePhase: state.airStrikeState ? state.airStrikeState.phase : 'countdown'
       });
@@ -172,6 +295,7 @@ export function syncCoopFrame(){
       if(coopState.remotePos.airStrikePhase === 'flying' && !coopState.remotePos.airStrikeFinished){
         coopState.remoteAirStrikeCraft.flameGroup.visible = true;
         coopState.remoteAirStrikeCraft.missileHolder.position.set(0, 0, 0);
+        coopState.remoteAirStrikeCraft.missileHolder.rotation.y = coopState.remotePos.yaw || 0;
       }
     }
     return;
@@ -684,7 +808,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ==========================================
-// PeerJS 共闘ルーム接続・切断制御
+// PeerJS 共闘ルーム接続・切断・全同期制御
 // ==========================================
 export function leaveCoopRoom(){
   cancelMyCoopRecruit(true);
@@ -700,7 +824,8 @@ export function leaveCoopRoom(){
   coopState.isCoop = false;
   coopState.isHost = false;
   coopState.coopRoomCode = null;
-  coopState.coopStarting = false;
+  coopState.battleSoloOverride = false;
+  resetCoopMatchFlags();
 
   if(coopState.remotePlayerMesh && state.scene){
     state.scene.remove(coopState.remotePlayerMesh);
@@ -733,7 +858,8 @@ function setupCoopDataHandlers(connection){
   coopState.conn = connection;
   connection.on('open', () => {
     coopState.isCoop = true;
-    coopState.coopStarting = false;
+    coopState.battleSoloOverride = false;
+    resetCoopMatchFlags();
 
     if(myActiveRecruitId) cancelMyCoopRecruit(true);
 
@@ -772,36 +898,150 @@ function setupCoopDataHandlers(connection){
       coopState.remotePos.y = data.y || 0;
       coopState.remotePos.z = data.z;
       coopState.remotePos.yaw = data.yaw;
+      if(typeof data.pitch === 'number') coopState.remotePos.pitch = data.pitch;
       if(data.airStrikePhase) coopState.remotePos.airStrikePhase = data.airStrikePhase;
       if(data.username && data.username !== coopState.remotePos.username){
         coopState.remotePos.username = data.username;
         updateRemoteNameLabel(data.username);
       }
+    } else if(data.type === 'battleInvite'){
+      // 出撃参加要請を受信！
+      // もし自分もすでに待機中（2人同時にスタートを押して被った）場合
+      if(coopState.pendingOutgoingInvite){
+        const myOut = coopState.pendingOutgoingInvite;
+        coopState.pendingOutgoingInvite = null;
+        closeCoopWaitModal();
+
+        if(coopState.isHost){
+          // ホスト優先！ホスト側の設定で参加者を強制合流させる
+          coopState.battleSoloOverride = false;
+          resetCoopMatchFlags();
+          sendCoop({
+            type: 'forceMergeBattle',
+            mode: myOut.mode,
+            diffId: myOut.diffId,
+            missionData: myOut.missionData
+          });
+          showToast('出撃が重なったため、ホスト側の設定で強制合流しました！');
+          if(appCallbacks.startBattle){
+            appCallbacks.startBattle(myOut.mode, myOut.diffId, myOut.missionData);
+          }
+        } else {
+          // 参加者（ゲスト）：自分が作った設定・マップを破棄してホスト側のゲームへ強制合流
+          coopState.battleSoloOverride = false;
+          resetCoopMatchFlags();
+          showToast('ホスト側のゲーム設定が優先されたため、ホストの戦場へ強制合流します！');
+          if(appCallbacks.startBattle){
+            appCallbacks.startBattle(data.mode, data.diffId, data.missionData);
+          }
+        }
+        return;
+      }
+
+      // 自分が待機中でなければ、専用の参加要請画面（参加 / 拒否）を表示
+      coopState.pendingIncomingInvite = {
+        mode: data.mode,
+        diffId: data.diffId,
+        missionData: data.missionData,
+        senderName: data.senderName,
+        fromHost: !!data.fromHost
+      };
+      openCoopInviteModal(coopState.pendingIncomingInvite);
+    } else if(data.type === 'battleInviteCancelled'){
+      if(coopState.pendingIncomingInvite){
+        coopState.pendingIncomingInvite = null;
+        closeCoopInviteModal();
+        showToast('相手が出撃待機をキャンセルしました');
+      }
+    } else if(data.type === 'battleInviteAccepted'){
+      const out = coopState.pendingOutgoingInvite;
+      coopState.pendingOutgoingInvite = null;
+      closeCoopWaitModal();
+      if(out){
+        coopState.battleSoloOverride = false;
+        resetCoopMatchFlags();
+        showToast('フレンドが参加しました！共闘バトル開始！');
+        if(appCallbacks.startBattle){
+          appCallbacks.startBattle(out.mode, out.diffId, out.missionData);
+        }
+      }
+    } else if(data.type === 'battleInviteDeclined'){
+      const out = coopState.pendingOutgoingInvite;
+      coopState.pendingOutgoingInvite = null;
+      closeCoopWaitModal();
+      if(out){
+        // 拒否された場合：先にステージに入った自分だけのソロモードで開始
+        coopState.battleSoloOverride = true;
+        resetCoopMatchFlags();
+        showToast('参加要請が拒否されたため、ソロモードでゲームを開始します！');
+        if(appCallbacks.startBattle){
+          appCallbacks.startBattle(out.mode, out.diffId, out.missionData);
+        }
+      }
+    } else if(data.type === 'forceMergeBattle'){
+      // ホストからの強制合流命令：参加側の設定・マップをクリアしてホスト側マップのみ開始
+      coopState.pendingOutgoingInvite = null;
+      coopState.pendingIncomingInvite = null;
+      closeCoopWaitModal();
+      closeCoopInviteModal();
+      coopState.battleSoloOverride = false;
+      resetCoopMatchFlags();
+      showToast('ホスト側のゲーム設定が優先され、ホストのゲームへ合流しました！');
+      if(appCallbacks.startBattle){
+        appCallbacks.startBattle(data.mode, data.diffId, data.missionData);
+      }
     } else if(data.type === 'startBattle'){
+      coopState.pendingOutgoingInvite = null;
+      coopState.pendingIncomingInvite = null;
+      closeCoopWaitModal();
+      closeCoopInviteModal();
+      coopState.battleSoloOverride = false;
+      resetCoopMatchFlags();
       if(appCallbacks.startBattle){
         appCallbacks.startBattle(data.mode || 'FALL_MISSILE', data.diffId || 'easy', data.missionData || null);
       }
+    } else if(data.type === 'requestRetry'){
+      // ゲストがリトライを押した際、ホストが受け取って双方リトライ開始
+      if(coopState.isHost){
+        const sharedMission = state.activeBattleMode === 'AIR_STRIKE'
+          ? generateAirStrikeMissionData(CONFIG, state.activeDifficulty)
+          : null;
+        coopState.battleSoloOverride = false;
+        resetCoopMatchFlags();
+        sendCoop({
+          type: 'startBattle',
+          mode: state.activeBattleMode,
+          diffId: state.activeDifficulty.id,
+          missionData: sharedMission
+        });
+        if(appCallbacks.startBattle){
+          appCallbacks.startBattle(state.activeBattleMode, state.activeDifficulty.id, sharedMission);
+        }
+      }
     } else if(data.type === 'abortBattle'){
-      state.score = 0;
-      state.earnedGoldInMatch = 0;
-      state.wave = 1;
-      state.peace = 100;
-      state.spawned = 0;
-      state.tick = 0;
-      state.wait = 0;
-      state.airStrikeState = null;
-      if(appCallbacks.enterHome) appCallbacks.enterHome();
+      if(!coopState.battleSoloOverride){
+        state.score = 0;
+        state.earnedGoldInMatch = 0;
+        state.wave = 1;
+        state.peace = 100;
+        state.spawned = 0;
+        state.tick = 0;
+        state.wait = 0;
+        state.airStrikeState = null;
+        resetCoopMatchFlags();
+        if(appCallbacks.enterHome) appCallbacks.enterHome();
+      }
     } else if(data.type === 'leaveCoop'){
       showToast('フレンドが共闘ルームから退出しました');
       leaveCoopRoom();
       if(state.gameMode === 'battle' && appCallbacks.enterHome) appCallbacks.enterHome();
     } else if(data.type === 'spawnEnemy'){
-      if(!coopState.isHost && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+      if(!coopState.isHost && !coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
         const e = spawn(T, state.scene, state.target, state.wave, {}, data.payload.kind, state.modelTemplates, true, data.payload);
         state.enemies.push(e);
       }
     } else if(data.type === 'syncBattleState'){
-      if(!coopState.isHost && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+      if(!coopState.isHost && !coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
         state.wave = data.wave;
         state.peace = data.peace;
         state.score = data.score;
@@ -815,50 +1055,83 @@ function setupCoopDataHandlers(connection){
         }
       }
     } else if(data.type === 'clientHit'){
-      if(coopState.isHost && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+      if(coopState.isHost && !coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
         const en = state.enemies.find(x => x.userData.id === data.enemyId);
-        if(en){
-          applyEnemyDamage(en, data.dmg, data.beamColor, data.scoreMult, {
-            isCoop: true,
-            isHost: true,
-            sendCoop,
-            fromRemote: false
-          });
-        }
+        if(en) applyEnemyDamage(en, data.dmg, data.beamColor, data.scoreMult, getCoopContext(), true);
       }
-    } else if(data.type === 'enemyDestroyed'){
-      if(!coopState.isHost && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
-        const en = state.enemies.find(x => x.userData.id === data.enemyId);
-        if(en){
-          burst(en.position, 0xffaa00);
+    } else if(data.type === 'destroyEnemy'){
+      if(!coopState.isHost && !coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        const idx = state.enemies.findIndex(x => x.userData.id === data.enemyId);
+        if(idx >= 0){
+          const en = state.enemies[idx];
+          burst(en.position, data.beamColor || 0x00f5d4);
           state.scene.remove(en);
-          const idx = state.enemies.indexOf(en);
-          if(idx !== -1) state.enemies.splice(idx, 1);
+          state.enemies.splice(idx, 1);
+          hud(state.wave, data.remaining, state.peace, getMaxWaves());
         }
-        state.score = data.score;
       }
     } else if(data.type === 'battleEnd'){
-      if(!coopState.isHost && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
-        state.score = data.score;
-        if(appCallbacks.finishBattle) appCallbacks.finishBattle(data.win);
+      if(!coopState.isHost && !coopState.battleSoloOverride && state.gameMode === 'battle' && appCallbacks.finishBattle){
+        appCallbacks.finishBattle(data.win);
       }
-    } else if(data.type === 'airStrikeDone'){
-      coopState.remotePos.airStrikeFinished = true;
-      coopState.remotePos.remoteSurvivedM = data.survivedM;
-      coopState.remotePos.remoteHitTarget = data.hitTarget;
-      if(coopState.remoteAirStrikeCraft){
-        coopState.remoteAirStrikeCraft.flameGroup.visible = false;
-        coopState.remoteAirStrikeCraft.missileHolder.visible = false;
+    } else if(data.type === 'airStrikeFinished'){
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'AIR_STRIKE' && state.airStrikeState){
+        coopState.remotePos.airStrikeFinished = true;
+        coopState.remotePos.remoteSurvivedM = data.survivedM || 0;
+        coopState.remotePos.remoteHitTarget = !!data.hitTarget;
+        if(coopState.remoteAirStrikeCraft){
+          coopState.remoteAirStrikeCraft.flameGroup.visible = false;
+          burst(coopState.remoteAirStrikeCraft.root.position, data.hitTarget ? 0x00f5d4 : 0xff4d6d);
+        }
+        if(state.airStrikeState.localFinished){
+          finalizeAirStrikeResult(getCoopContext(), appCallbacks.finishBattle);
+        } else {
+          showToast(`${coopState.remotePos.username || 'フレンド'} が降下終了（記録: ${data.survivedM}m）`);
+        }
       }
-      if(state.airStrikeState && state.airStrikeState.phase === 'finished'){
-        finalizeAirStrikeResult(coopState.isCoop);
+    } else if(data.type === 'syncShotVisual'){
+      // 他プレイヤーの弾・弾道を自分のマップにも描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        const sPt = new T.Vector3(data.sx, data.sy, data.sz);
+        const ePt = new T.Vector3(data.ex, data.ey, data.ez);
+        spawnShortGradientProjectile(sPt, ePt, data.beamColor || 0x00f5d4, data.radiusScale || 1.0, null);
+      }
+    } else if(data.type === 'syncDetonation'){
+      // 他プレイヤーの爆発エフェクトを自分のマップにも描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        const iPt = new T.Vector3(data.ix, data.iy, data.iz);
+        spawnDetonationEffect(iPt, data.blastWorldRadius || 3.0, data.mainColor || 0xff9233, null);
+      }
+    } else if(data.type === 'syncRapidTurrets'){
+      // 他プレイヤーの RapidFire 設置タレットを自分のマップにも描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        spawnRemoteRapidTurrets(data.positions, data.durationSec || 10);
+      }
+    } else if(data.type === 'syncLaserTurretDeploy'){
+      // 他プレイヤーの Laser 四角錐タレット設置を自分のマップにも描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        spawnRemoteLaserTurret(data.x, data.z, data.mkNumber || 1);
+      }
+    } else if(data.type === 'syncLaserBeams'){
+      // 他プレイヤーの Laser 赤色レーザー照射をリアルタイム同期描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        updateRemoteLaserBeams(data.beams || []);
+      }
+    } else if(data.type === 'syncAutomaticVolley'){
+      // 他プレイヤーの Automatic 追尾ミサイル弾をリアルタイム同期描画
+      if(!coopState.battleSoloOverride && state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'){
+        spawnRemoteAutomaticVolley(data);
       }
     }
   });
 
-  connection.on('close', () => {
+  const handleDisconnect = () => {
+    const wasInBattle = (state.gameMode === 'battle' && !coopState.battleSoloOverride);
     coopState.isCoop = false;
+    coopState.isHost = false;
     coopState.conn = null;
+    coopState.battleSoloOverride = false;
+    resetCoopMatchFlags();
     if(coopState.remotePlayerMesh && state.scene){
       state.scene.remove(coopState.remotePlayerMesh);
       coopState.remotePlayerMesh = null;
@@ -867,62 +1140,76 @@ function setupCoopDataHandlers(connection){
       state.scene.remove(coopState.remoteAirStrikeCraft.root);
       coopState.remoteAirStrikeCraft = null;
     }
-    $('#coopStatusText').textContent = 'ステータス: 通信が切断されました';
+    $('#coopStatusText').textContent = 'ステータス: フレンドとの接続が切れました';
     const leaveBtn = $('#leaveCoopRoomBtn');
     if(leaveBtn) leaveBtn.style.display = 'none';
-  });
+    showToast('フレンドとの接続が切断されました');
+    if(wasInBattle && appCallbacks.enterHome) appCallbacks.enterHome();
+  };
+
+  connection.on('close', handleDisconnect);
+  connection.on('error', handleDisconnect);
 }
 
 export function createCoopRoom(){
-  cancelMyCoopRecruit(true);
-  if(coopState.peer){ try { coopState.peer.destroy(); } catch(e){} }
-  const code = Math.floor(1000 + Math.random() * 9000).toString();
+  if(coopState.peer) coopState.peer.destroy();
+  const code = String(Math.floor(1000 + Math.random() * 9000));
   coopState.coopRoomCode = code;
   coopState.isHost = true;
-  const peerId = 'spaa-coop-' + code;
-  $('#coopStatusText').textContent = 'ステータス: ルーム生成中...';
-  const recruitBtn = $('#recruitCoopBtn');
-  if(recruitBtn) recruitBtn.disabled = true;
+  coopState.isCoop = false;
+  coopState.battleSoloOverride = false;
+  resetCoopMatchFlags();
 
-  coopState.peer = new Peer(peerId);
-  coopState.peer.on('open', () => {
-    $('#roomCodeDisplay').textContent = code;
-    $('#coopStatusText').textContent = 'ステータス: ルーム作成完了！全体チャット募集またはID共有で待機中...';
-    if(recruitBtn){
-      recruitBtn.disabled = false;
-      recruitBtn.textContent = '全体チャットで募集する';
-    }
-    const leaveBtn = $('#leaveCoopRoomBtn');
-    if(leaveBtn) leaveBtn.style.display = 'block';
-  });
-  coopState.peer.on('connection', (c) => setupCoopDataHandlers(c));
-  coopState.peer.on('error', (err) => {
-    if(err && err.type === 'unavailable-id'){
-      createCoopRoom();
+  $('#roomCodeDisplay').textContent = `ID: ${code}`;
+  $('#coopStatusText').textContent = 'ステータス: フレンドの参加を待機中...';
+
+  const recruitBtn = $('#recruitCoopBtn');
+  if(recruitBtn){
+    recruitBtn.disabled = false;
+    recruitBtn.textContent = '全体チャットで募集する';
+  }
+  const leaveBtn = $('#leaveCoopRoomBtn');
+  if(leaveBtn) leaveBtn.style.display = 'block';
+
+  const p = new Peer('spaa-coop-' + code);
+  coopState.peer = p;
+
+  p.on('connection', (c) => {
+    if(coopState.conn && coopState.conn.open){
+      c.close();
       return;
     }
-    $('#coopStatusText').textContent = 'エラー: ' + err.message;
+    setupCoopDataHandlers(c);
+  });
+
+  p.on('error', (err) => {
+    $('#coopStatusText').textContent = `ステータス: 通信エラー (${err.type})`;
   });
 }
 
 export function joinCoopRoom(){
-  const code = $('#joinCodeInput').value.trim();
-  if(code.length !== 4){
-    $('#coopStatusText').textContent = 'エラー: 4桁の数字を入力してください';
+  const raw = ($('#joinCodeInput').value || '').trim();
+  if(!/^\d{4}$/.test(raw)){
+    $('#coopStatusText').textContent = 'ステータス: 4桁の数字を入力してください';
     return;
   }
-  cancelMyCoopRecruit(true);
-  if(coopState.peer){ try { coopState.peer.destroy(); } catch(e){} }
+  if(coopState.peer) coopState.peer.destroy();
   coopState.isHost = false;
-  coopState.coopRoomCode = code;
-  $('#coopStatusText').textContent = 'ステータス: ルーム ' + code + ' に接続中...';
+  coopState.isCoop = false;
+  coopState.coopRoomCode = raw;
+  coopState.battleSoloOverride = false;
+  resetCoopMatchFlags();
+  $('#coopStatusText').textContent = `ステータス: ルーム ${raw} に接続中...`;
 
-  coopState.peer = new Peer();
-  coopState.peer.on('open', () => {
-    const c = coopState.peer.connect('spaa-coop-' + code);
+  const p = new Peer();
+  coopState.peer = p;
+
+  p.on('open', () => {
+    const c = p.connect('spaa-coop-' + raw, { reliable: true });
     setupCoopDataHandlers(c);
   });
-  coopState.peer.on('error', () => {
-    $('#coopStatusText').textContent = '接続エラー: ルームが見つかりません';
+
+  p.on('error', (err) => {
+    $('#coopStatusText').textContent = `ステータス: 接続失敗 (${err.type})`;
   });
 }

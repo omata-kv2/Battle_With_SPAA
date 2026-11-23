@@ -2,7 +2,8 @@ import * as T from './libs/three.module.js';
 import { state, getEquippedSkin, getEffectiveStats, getSkinUpgrade } from './state.js';
 import {
   showToast, updateChargeGauge, updateSkillButtonUI, updateFireButtonUI,
-  hideFireButton, clearLaserAttackButtons, renderLaserAttackButtons, updateLaserAttackButtonState
+  hideFireButton, clearLaserAttackButtons, renderLaserAttackButtons, updateLaserAttackButtonState,
+  showExplosionChargeMeter, updateExplosionChargeMeter
 } from './ui.js';
 import { applyEnemyDamage, burst, burstWhiteStrong } from './enemies.js';
 
@@ -17,11 +18,15 @@ export const combatState = {
   fireHeld: false,
   autoFireTimer: 0,
   turrets: [],
+  remoteTurrets: [],
   laserDeployState: {
     maxCount: 1,
     deployedCount: 0,
     isDeployedComplete: false,
     plannedSlots: [],
+    turrets: []
+  },
+  remoteLaserState: {
     turrets: []
   },
   homingProjectiles: []
@@ -51,6 +56,19 @@ export function clearLaserTurretsAndBeams(){
   clearLaserAttackButtons();
 }
 
+export function clearRemoteCombatVisuals(){
+  for(const rt of combatState.remoteTurrets){
+    if(rt.mesh && state.scene) state.scene.remove(rt.mesh);
+  }
+  combatState.remoteTurrets.length = 0;
+
+  for(const rlt of combatState.remoteLaserState.turrets){
+    if(rlt.beamGroup && state.scene) state.scene.remove(rlt.beamGroup);
+    if(rlt.mesh && state.scene) state.scene.remove(rlt.mesh);
+  }
+  combatState.remoteLaserState.turrets.length = 0;
+}
+
 export function resetCombatState(){
   clearPendingShots();
   combatState.skillActiveTimer = 0;
@@ -62,6 +80,7 @@ export function resetCombatState(){
   combatState.autoFireTimer = 0;
 
   clearLaserTurretsAndBeams();
+  clearRemoteCombatVisuals();
 
   for(const t of combatState.turrets){
     if(t.mesh && state.scene) state.scene.remove(t.mesh);
@@ -74,6 +93,7 @@ export function resetCombatState(){
   combatState.homingProjectiles.length = 0;
 
   updateChargeGauge(0);
+  updateExplosionChargeMeter(0, false, false, 0);
 }
 
 function computeEquidistantMapPositions(count){
@@ -101,13 +121,13 @@ function computeEquidistantMapPositions(count){
   return positions;
 }
 
-function makeMkLabelSprite(text){
+function makeMkLabelSprite(text, strokeCol = '#ff4d6d'){
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 96;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = 'rgba(18, 6, 12, 0.85)';
-  ctx.strokeStyle = '#ff4d6d';
+  ctx.strokeStyle = strokeCol;
   ctx.lineWidth = 6;
   ctx.beginPath();
   ctx.roundRect(10, 10, 236, 76, 18);
@@ -128,7 +148,7 @@ function makeMkLabelSprite(text){
   return sprite;
 }
 
-function createLaserPyramidTurretMesh(tx, tz, mkNumber){
+function createLaserPyramidTurretMesh(tx, tz, mkNumber, labelPrefix = ''){
   const groundY = -2.0;
   const pyramidH = 1.35;
 
@@ -165,11 +185,11 @@ function createLaserPyramidTurretMesh(tx, tz, mkNumber){
   apexOrb.position.set(0, pyramidH, 0);
   group.add(apexOrb);
 
-  const labelSprite = makeMkLabelSprite(`Mk.${mkNumber}`);
+  const labelSprite = makeMkLabelSprite(`${labelPrefix}Mk.${mkNumber}`);
   labelSprite.position.set(0, pyramidH + 0.55, 0);
   group.add(labelSprite);
 
-  state.scene.add(group);
+  if(state.scene) state.scene.add(group);
   const apexWorld = new T.Vector3(tx, groundY + pyramidH, tz);
   burst(apexWorld, 0xff4d6d);
 
@@ -218,6 +238,15 @@ function deployNextLaserTurret(coopCtx = {}){
     beamGroup: null
   });
 
+  if(coopCtx.isCoop && coopCtx.sendCoop){
+    coopCtx.sendCoop({
+      type: 'syncLaserTurretDeploy',
+      x: slot.x,
+      z: slot.z,
+      mkNumber: slot.mkNumber
+    });
+  }
+
   ds.deployedCount++;
 
   if(ds.deployedCount < ds.maxCount){
@@ -231,6 +260,18 @@ function deployNextLaserTurret(coopCtx = {}){
     });
     showToast(`全${ds.maxCount}基のタレット配置完了！「Mk.1〜Mk.${ds.maxCount}攻撃」ボタン解放！`);
   }
+}
+
+export function spawnRemoteLaserTurret(x, z, mkNumber){
+  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  const { group, apexOrb, apexWorld } = createLaserPyramidTurretMesh(x, z, mkNumber, '僚機 ');
+  combatState.remoteLaserState.turrets.push({
+    mkNumber,
+    mesh: group,
+    apexOrb,
+    apexWorld,
+    beamGroup: null
+  });
 }
 
 function ensureLaserBeamMeshForTurret(lt){
@@ -252,7 +293,7 @@ function ensureLaserBeamMeshForTurret(lt){
   grp.userData.coreCyl = coreCyl;
   grp.userData.auraCyl = auraCyl;
   grp.userData.muzzleSphere = muzzleSphere;
-  state.scene.add(grp);
+  if(state.scene) state.scene.add(grp);
   lt.beamGroup = grp;
   return grp;
 }
@@ -262,6 +303,36 @@ function removeLaserBeamMeshForTurret(lt){
     state.scene.remove(lt.beamGroup);
   }
   lt.beamGroup = null;
+}
+
+export function updateRemoteLaserBeams(activeBeams){
+  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  const activeMap = new Map();
+  for(const b of (activeBeams || [])){
+    activeMap.set(b.mkNumber, b);
+  }
+
+  for(const rlt of combatState.remoteLaserState.turrets){
+    const info = activeMap.get(rlt.mkNumber);
+    if(info){
+      const beamGrp = ensureLaserBeamMeshForTurret(rlt);
+      const startPt = rlt.apexWorld;
+      const aimPt = new T.Vector3(info.aimX, info.aimY, info.aimZ);
+      const dir = aimPt.clone().sub(startPt).normalize();
+      const beamLen = 135;
+      const endPt = startPt.clone().addScaledVector(dir, beamLen);
+
+      beamGrp.position.copy(startPt).add(endPt).multiplyScalar(0.5);
+      beamGrp.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
+      const rScale = info.radiusMult || 1.0;
+      beamGrp.userData.coreCyl.scale.set(rScale, beamLen, rScale);
+      beamGrp.userData.auraCyl.scale.set(rScale, beamLen, rScale);
+      beamGrp.userData.muzzleSphere.position.set(0, -beamLen * 0.5, 0);
+      beamGrp.userData.muzzleSphere.scale.setScalar(rScale);
+    } else {
+      removeLaserBeamMeshForTurret(rlt);
+    }
+  }
 }
 
 function getCrosshairAimPoint(){
@@ -359,54 +430,59 @@ function dealHitToEnemy(enemyObj, dmg, beamColor, scoreMult, coopCtx, strongWhit
   }
 }
 
-function spawnAdditionalTurrets(turretCount, durationSec, playerAtk, playerFireRate){
+function createPyramidTurretVisual(tx, tz, mainColor = 0x4de680, ringColor = 0x00f5d4){
+  const groundY = -2.0;
+  const pyramidH = 1.15;
+  const group = new T.Group();
+  group.position.set(tx, groundY, tz);
+
+  const ring = new T.Mesh(
+    new T.RingGeometry(0.62, 0.85, 4),
+    new T.MeshBasicMaterial({ color: ringColor, side: T.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.rotation.z = Math.PI / 4;
+  ring.position.y = 0.03;
+  group.add(ring);
+
+  const pyramid = new T.Mesh(
+    new T.ConeGeometry(0.68, pyramidH, 4),
+    new T.MeshStandardMaterial({
+      color: mainColor,
+      emissive: 0x166534,
+      emissiveIntensity: 0.45,
+      metalness: 0.5,
+      roughness: 0.3
+    })
+  );
+  pyramid.position.y = pyramidH / 2;
+  pyramid.rotation.y = Math.PI / 4;
+  group.add(pyramid);
+
+  const apexOrb = new T.Mesh(
+    new T.SphereGeometry(0.14, 8, 8),
+    new T.MeshBasicMaterial({ color: 0xffffff })
+  );
+  apexOrb.position.set(0, pyramidH, 0);
+  group.add(apexOrb);
+
+  if(state.scene) state.scene.add(group);
+  const apexWorld = new T.Vector3(tx, groundY + pyramidH, tz);
+  burst(apexWorld, mainColor);
+  return { group, apexOrb, apexWorld };
+}
+
+function spawnAdditionalTurrets(turretCount, durationSec, playerAtk, playerFireRate, coopCtx = {}){
   for(const oldT of combatState.turrets){
     if(oldT.mesh && state.scene) state.scene.remove(oldT.mesh);
   }
   combatState.turrets.length = 0;
 
   const positions = computeEquidistantMapPositions(turretCount);
-  const groundY = -2.0;
-  const pyramidH = 1.15;
 
   for(let i = 0; i < positions.length; i++){
     const { x: tx, z: tz } = positions[i];
-    const group = new T.Group();
-    group.position.set(tx, groundY, tz);
-
-    const ring = new T.Mesh(
-      new T.RingGeometry(0.62, 0.85, 4),
-      new T.MeshBasicMaterial({ color: 0x00f5d4, side: T.DoubleSide })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.rotation.z = Math.PI / 4;
-    ring.position.y = 0.03;
-    group.add(ring);
-
-    const pyramid = new T.Mesh(
-      new T.ConeGeometry(0.68, pyramidH, 4),
-      new T.MeshStandardMaterial({
-        color: 0x4de680,
-        emissive: 0x166534,
-        emissiveIntensity: 0.45,
-        metalness: 0.5,
-        roughness: 0.3
-      })
-    );
-    pyramid.position.y = pyramidH / 2;
-    pyramid.rotation.y = Math.PI / 4;
-    group.add(pyramid);
-
-    const apexOrb = new T.Mesh(
-      new T.SphereGeometry(0.14, 8, 8),
-      new T.MeshBasicMaterial({ color: 0xffffff })
-    );
-    apexOrb.position.set(0, pyramidH, 0);
-    group.add(apexOrb);
-
-    state.scene.add(group);
-    const apexWorld = new T.Vector3(tx, groundY + pyramidH, tz);
-    burst(apexWorld, 0x4de680);
+    const { group, apexOrb, apexWorld } = createPyramidTurretVisual(tx, tz, 0x4de680, 0x00f5d4);
 
     combatState.turrets.push({
       mesh: group,
@@ -416,6 +492,32 @@ function spawnAdditionalTurrets(turretCount, durationSec, playerAtk, playerFireR
       atk: playerAtk,
       fireRate: playerFireRate,
       fireTimer: 0
+    });
+  }
+
+  if(coopCtx.isCoop && coopCtx.sendCoop){
+    coopCtx.sendCoop({
+      type: 'syncRapidTurrets',
+      positions,
+      durationSec
+    });
+  }
+}
+
+export function spawnRemoteRapidTurrets(positions, durationSec){
+  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  for(const oldRt of combatState.remoteTurrets){
+    if(oldRt.mesh && state.scene) state.scene.remove(oldRt.mesh);
+  }
+  combatState.remoteTurrets.length = 0;
+
+  for(const pos of (positions || [])){
+    const { group, apexOrb, apexWorld } = createPyramidTurretVisual(pos.x, pos.z, 0x38c8f0, 0x00f5d4);
+    combatState.remoteTurrets.push({
+      mesh: group,
+      apexOrb,
+      apexWorld,
+      life: durationSec
     });
   }
 }
@@ -428,15 +530,7 @@ function destroyTargetsList(targetsToDestroy, beamColor, eff, coopCtx){
     if(!state.enemies.includes(en)) continue;
     const targetPos = en.position.clone();
 
-    const beam = new T.Mesh(
-      new T.CylinderGeometry(0.06, 0.12, 1, 6),
-      new T.MeshBasicMaterial({ color: beamColor })
-    );
-    beam.position.copy(originPt).add(targetPos).multiplyScalar(0.5);
-    beam.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), targetPos.clone().sub(originPt).normalize());
-    beam.scale.y = originPt.distanceTo(targetPos);
-    state.scene.add(beam);
-    state.fx.push({ m: beam, life: 14 });
+    spawnShortGradientProjectile(originPt, targetPos, beamColor, 1.0, coopCtx);
 
     dealHitToEnemy(en, 9999, beamColor, eff.scoreMult, coopCtx, false);
     destroyedCount++;
@@ -474,7 +568,7 @@ export function activateUnitSkill(coopCtx = {}){
   if(skill.id === 'AdditionalTurre'){
     const dur = eff.additionalTurreDuration;
     combatState.skillActiveTimer = dur;
-    spawnAdditionalTurrets(eff.rapidTurretCount, dur, eff.atk, eff.rawRate);
+    spawnAdditionalTurrets(eff.rapidTurretCount, dur, eff.atk, eff.rawRate, coopCtx);
     showToast(`【AdditionalTurre Lv.${eff.skillLv}】タレット${eff.rapidTurretCount}基を均等配置！（${dur}秒 / 攻撃力${eff.atk}・連射${eff.rawRate.toFixed(1)}）`);
     return;
   }
@@ -489,8 +583,8 @@ export function activateUnitSkill(coopCtx = {}){
     const destroyedCount = destroyTargetsList(sorted, 0x00f5d4, eff, coopCtx);
     showToast(`【OriginBurst Lv.${eff.skillLv}】上空の飛翔体 ${destroyedCount}体（上限${maxClear}体）を一掃！`);
   } else if(skill.id === 'FewCharger'){
-    const newCharge = Math.max(0.05, skin.chargeTime - eff.fewChargerReduction);
-    showToast(`【FewCharger Lv.${eff.skillLv}】10秒間 溜め時間 -${eff.fewChargerReduction}秒（${newCharge.toFixed(1)}秒）！`);
+    const maxTime = Math.max(0.5, 3.0 - eff.fewChargerReduction);
+    showToast(`【FewCharger Lv.${eff.skillLv}】10秒間 最大チャージ時間を ${maxTime.toFixed(1)}秒 に短縮！`);
   } else if(skill.id === 'InfinityBarrel'){
     combatState.attackCooldownTimer = 0;
     showToast(`【InfinityBarrel Lv.${eff.skillLv}】10秒間 撃ち放題＆拡散範囲 ${eff.infinitySpreadMult}倍！`);
@@ -520,52 +614,73 @@ function getDefaultMuzzleOrigin(rightOffset = 0.22, downOffset = 0.34){
     .addScaledVector(up, -downOffset);
 }
 
-function spawnVisibleProjectileAndTrail(startPt, endPt, beamColor, radiusScale = 1.0, lifeFrames = 11){
-  const dist = startPt.distanceTo(endPt);
+// Laser と Automatic 以外の機体用：弾に近いほど色が濃く、離れると透明に近づく短い弾道トレイル
+export function spawnShortGradientProjectile(startPt, endPt, beamColor, radiusScale = 1.0, coopCtx = null){
+  if(!state.scene) return;
+  const totalVec = endPt.clone().sub(startPt);
+  const dist = totalVec.length();
   if(dist < 0.05) return;
-  const dir = endPt.clone().sub(startPt).normalize();
-
-  const outerBeam = new T.Mesh(
-    new T.CylinderGeometry(0.065 * radiusScale, 0.11 * radiusScale, 1, 8),
-    new T.MeshBasicMaterial({ color: beamColor, transparent: true, opacity: 0.85 })
-  );
-  outerBeam.position.copy(startPt).add(endPt).multiplyScalar(0.5);
-  outerBeam.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
-  outerBeam.scale.y = dist;
-  state.scene.add(outerBeam);
-  state.fx.push({ m: outerBeam, life: lifeFrames });
-
-  const coreBeam = new T.Mesh(
-    new T.CylinderGeometry(0.028 * radiusScale, 0.045 * radiusScale, 1, 6),
-    new T.MeshBasicMaterial({ color: 0xffffff })
-  );
-  coreBeam.position.copy(startPt).add(endPt).multiplyScalar(0.5);
-  coreBeam.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
-  coreBeam.scale.y = dist;
-  state.scene.add(coreBeam);
-  state.fx.push({ m: coreBeam, life: Math.max(6, lifeFrames - 2) });
+  const dir = totalVec.clone().normalize();
 
   const slugGroup = new T.Group();
+
+  // 先頭の弾体（最も濃いコア＋オーラ）
   const slugCore = new T.Mesh(
-    new T.SphereGeometry(0.18 * radiusScale, 8, 8),
+    new T.SphereGeometry(0.17 * radiusScale, 8, 8),
     new T.MeshBasicMaterial({ color: 0xffffff })
   );
   const slugAura = new T.Mesh(
-    new T.SphereGeometry(0.32 * radiusScale, 8, 8),
-    new T.MeshBasicMaterial({ color: beamColor, transparent: true, opacity: 0.78 })
+    new T.SphereGeometry(0.30 * radiusScale, 8, 8),
+    new T.MeshBasicMaterial({ color: beamColor, transparent: true, opacity: 0.92 })
   );
   slugGroup.add(slugCore, slugAura);
+
+  // 弾の直後から後方へ伸びる短いグラデーション軌跡（全4段階、離れるほど細く透明になる）
+  const trailSegments = [
+    { len: 1.05, rTop: 0.14, rBot: 0.11, opacity: 0.72, offsetBack: 0.55 },
+    { len: 1.15, rTop: 0.11, rBot: 0.08, opacity: 0.44, offsetBack: 1.60 },
+    { len: 1.15, rTop: 0.08, rBot: 0.05, opacity: 0.21, offsetBack: 2.70 },
+    { len: 1.05, rTop: 0.05, rBot: 0.02, opacity: 0.07, offsetBack: 3.75 }
+  ];
+
+  for(const seg of trailSegments){
+    const segMesh = new T.Mesh(
+      new T.CylinderGeometry(seg.rTop * radiusScale, seg.rBot * radiusScale, seg.len, 7),
+      new T.MeshBasicMaterial({
+        color: beamColor,
+        transparent: true,
+        opacity: seg.opacity,
+        depthWrite: false
+      })
+    );
+    // ローカル +Y 方向が進行方向になるよう回転させるため、後方は -Y
+    segMesh.position.set(0, -seg.offsetBack, 0);
+    slugGroup.add(segMesh);
+  }
+
   slugGroup.position.copy(startPt);
+  slugGroup.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
   state.scene.add(slugGroup);
 
-  const travelFrames = 7;
-  const stepVec = endPt.clone().sub(startPt).divideScalar(travelFrames);
+  const travelFrames = Math.max(5, Math.min(9, Math.round(dist / 7.5)));
+  const stepVec = totalVec.clone().divideScalar(travelFrames);
   state.fx.push({ m: slugGroup, life: travelFrames, v: stepVec });
+
+  if(coopCtx && coopCtx.isCoop && coopCtx.sendCoop){
+    coopCtx.sendCoop({
+      type: 'syncShotVisual',
+      sx: startPt.x, sy: startPt.y, sz: startPt.z,
+      ex: endPt.x, ey: endPt.y, ez: endPt.z,
+      beamColor,
+      radiusScale
+    });
+  }
 }
 
-function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0xff9233){
+export function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0xff9233, coopCtx = null){
+  if(!state.scene) return;
   const flashCore = new T.Mesh(
-    new T.SphereGeometry(Math.max(0.55, blastWorldRadius * 0.55), 14, 12),
+    new T.SphereGeometry(Math.max(0.55, blastWorldRadius * 0.52), 14, 12),
     new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 })
   );
   flashCore.position.copy(impactPt);
@@ -574,14 +689,14 @@ function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0xff9233)
 
   const blastSphere = new T.Mesh(
     new T.SphereGeometry(blastWorldRadius, 18, 14),
-    new T.MeshBasicMaterial({ color: mainColor, transparent: true, opacity: 0.52 })
+    new T.MeshBasicMaterial({ color: mainColor, transparent: true, opacity: 0.48 })
   );
   blastSphere.position.copy(impactPt);
   state.scene.add(blastSphere);
   state.fx.push({ m: blastSphere, life: 18 });
 
   const ring1 = new T.Mesh(
-    new T.RingGeometry(blastWorldRadius * 0.65, blastWorldRadius * 1.15, 24),
+    new T.RingGeometry(blastWorldRadius * 0.65, blastWorldRadius * 1.12, 24),
     new T.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.85, side: T.DoubleSide })
   );
   ring1.position.copy(impactPt);
@@ -609,7 +724,7 @@ function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0xff9233)
     state.scene.add(spark);
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const spd = (0.16 + Math.random() * 0.28) * Math.max(0.8, blastWorldRadius * 0.55);
+    const spd = (0.16 + Math.random() * 0.28) * Math.max(0.8, blastWorldRadius * 0.45);
     state.fx.push({
       m: spark,
       life: 22,
@@ -618,6 +733,15 @@ function spawnDetonationEffect(impactPt, blastWorldRadius, mainColor = 0xff9233)
         Math.cos(phi) * spd,
         Math.sin(phi) * Math.sin(theta) * spd
       )
+    });
+  }
+
+  if(coopCtx && coopCtx.isCoop && coopCtx.sendCoop){
+    coopCtx.sendCoop({
+      type: 'syncDetonation',
+      ix: impactPt.x, iy: impactPt.y, iz: impactPt.z,
+      blastWorldRadius,
+      mainColor
     });
   }
 }
@@ -651,7 +775,7 @@ export function fireSingleBeam(skin, effectiveStats, spreadYaw = 0, spreadPitch 
 
   const endPt = hit ? hit.position.clone() : rayOrigin.clone().add(d.clone().multiplyScalar(55));
   const beamRadiusScale = Math.max(0.85, hitRadius / 2.4);
-  spawnVisibleProjectileAndTrail(visualOrigin, endPt, beamColor, beamRadiusScale, 11);
+  spawnShortGradientProjectile(visualOrigin, endPt, beamColor, beamRadiusScale, coopCtx);
 
   if(strongWhiteFx){
     for(let k = 0; k < 5; k++){
@@ -668,7 +792,40 @@ export function fireSingleBeam(skin, effectiveStats, spreadYaw = 0, spreadPitch 
   return hit;
 }
 
-function executeExplosionAttack(skin, eff, coopCtx){
+function getExplosionEffectiveChargedSec(skin, eff){
+  const reduction = (skin.skill.id === 'FewCharger' && combatState.skillActiveTimer > 0)
+    ? eff.fewChargerReduction
+    : 0;
+  const maxChargeSec = Math.max(0.5, (skin.chargeTime || 3.0) - reduction);
+  const ratio = Math.min(1, combatState.chargeElapsed / maxChargeSec);
+  // 0.1秒単位に正規化（0.0〜3.0s）
+  const rawSteps = Math.floor(ratio * 30 + 1e-6);
+  const quantizedSec = Number((rawSteps / 10).toFixed(1));
+  const isMax = ratio >= 1.0;
+  return { quantizedSec, isMax, maxChargeSec };
+}
+
+export function releaseExplosionCharge(coopCtx = {}){
+  if(!combatState.isCharging) return;
+  const skin = getEquippedSkin();
+  const eff = getEffectiveStats(skin);
+  const { quantizedSec } = getExplosionEffectiveChargedSec(skin, eff);
+
+  combatState.isCharging = false;
+  combatState.chargeElapsed = 0;
+  updateChargeGauge(0);
+  updateExplosionChargeMeter(0, false, false, eff.bonusBlastRadiusM);
+
+  if(state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE' || state.modalOpen) return;
+  if(skin.attackType !== 'explosion') return;
+
+  // 最小単位0.1秒として、秒数(0.1秒ごと増やす) × 5(定数) + アップグレード加算分
+  const finalChargedSec = Math.max(0.1, quantizedSec);
+  const totalRadiusM = Number((finalChargedSec * 5 + eff.bonusBlastRadiusM).toFixed(2));
+  executeExplosionAttack(skin, eff, totalRadiusM, coopCtx);
+}
+
+function executeExplosionAttack(skin, eff, totalRadiusM, coopCtx){
   const d = new T.Vector3();
   state.camera.getWorldDirection(d);
 
@@ -686,10 +843,10 @@ function executeExplosionAttack(skin, eff, coopCtx){
   }
 
   const impactPt = hit ? hit.position.clone() : rayOrigin.clone().add(d.clone().multiplyScalar(52));
-  spawnVisibleProjectileAndTrail(visualOrigin, impactPt, beamColor, 1.45, 14);
+  spawnShortGradientProjectile(visualOrigin, impactPt, beamColor, 1.35, coopCtx);
 
-  const blastWorldRadius = Math.max(1.8, eff.blastRadiusM * 1.65);
-  spawnDetonationEffect(impactPt, blastWorldRadius, beamColor);
+  const blastWorldRadius = Math.max(0.85, totalRadiusM * 1.45);
+  spawnDetonationEffect(impactPt, blastWorldRadius, beamColor, coopCtx);
 
   const affected = state.enemies.filter(e => e === hit || e.position.distanceTo(impactPt) <= blastWorldRadius);
   for(const targetEn of affected){
@@ -714,7 +871,47 @@ function executeScatterAttack(skin, eff, isInfinityActive, coopCtx){
   }
 }
 
-function executeAutomaticVolley(skin, eff){
+function spawnAutomaticProjectilesFromData(origin, launchDirs, targetIds, isFighterPriority, dmg){
+  if(!state.scene) return;
+  for(let i = 0; i < launchDirs.length; i++){
+    const dir = launchDirs[i].clone().normalize();
+    const tid = targetIds[i] || null;
+    const chosenTarget = tid ? (state.enemies.find(e => e.userData.id === tid) || null) : null;
+
+    const projGroup = new T.Group();
+    const core = new T.Mesh(
+      new T.SphereGeometry(0.16, 8, 8),
+      new T.MeshBasicMaterial({ color: isFighterPriority ? 0xff4d6d : 0xe0aaff })
+    );
+    const halo = new T.Mesh(
+      new T.SphereGeometry(0.27, 8, 8),
+      new T.MeshBasicMaterial({ color: 0xc77dff, transparent: true, opacity: 0.45 })
+    );
+    projGroup.add(core, halo);
+    projGroup.position.copy(origin);
+    state.scene.add(projGroup);
+
+    combatState.homingProjectiles.push({
+      mesh: projGroup,
+      pos: origin.clone(),
+      vel: dir.multiplyScalar(32.0),
+      targetEnemy: chosenTarget,
+      isFighterPriority,
+      dmg,
+      life: 3.5,
+      age: 0
+    });
+  }
+}
+
+export function spawnRemoteAutomaticVolley(payload){
+  if(!state.scene || state.gameMode !== 'battle' || state.activeBattleMode !== 'FALL_MISSILE') return;
+  const origin = new T.Vector3(payload.ox, payload.oy, payload.oz);
+  const dirs = (payload.dirs || []).map(d => new T.Vector3(d.x, d.y, d.z));
+  spawnAutomaticProjectilesFromData(origin, dirs, payload.targetIds || [], !!payload.isFighterPriority, 0);
+}
+
+function executeAutomaticVolley(skin, eff, coopCtx = {}){
   combatState.attackCooldownTimer = skin.attackCooldown || 1.0;
 
   const isMultiBurst = (skin.skill.id === 'MultiBurst' && combatState.skillActiveTimer > 0);
@@ -739,6 +936,8 @@ function executeAutomaticVolley(skin, eff){
 
   const assignedSet = new Set();
   const coneAngleRad = Math.PI / 3;
+  const launchDirs = [];
+  const targetIds = [];
 
   for(let i = 0; i < totalShots; i++){
     let launchDir;
@@ -766,28 +965,19 @@ function executeAutomaticVolley(skin, eff){
       chosenTarget = sortedEnemies[i % sortedEnemies.length];
     }
 
-    const projGroup = new T.Group();
-    const core = new T.Mesh(
-      new T.SphereGeometry(0.16, 8, 8),
-      new T.MeshBasicMaterial({ color: isMultiBurst ? 0xff4d6d : 0xe0aaff })
-    );
-    const halo = new T.Mesh(
-      new T.SphereGeometry(0.27, 8, 8),
-      new T.MeshBasicMaterial({ color: 0xc77dff, transparent: true, opacity: 0.45 })
-    );
-    projGroup.add(core, halo);
-    projGroup.position.copy(origin);
-    state.scene.add(projGroup);
+    launchDirs.push(launchDir);
+    targetIds.push(chosenTarget ? chosenTarget.userData.id : null);
+  }
 
-    combatState.homingProjectiles.push({
-      mesh: projGroup,
-      pos: origin.clone(),
-      vel: launchDir.multiplyScalar(32.0),
-      targetEnemy: chosenTarget,
-      isFighterPriority: isMultiBurst,
-      dmg: eff.atk,
-      life: 3.5,
-      age: 0
+  spawnAutomaticProjectilesFromData(origin, launchDirs, targetIds, isMultiBurst, eff.atk);
+
+  if(coopCtx.isCoop && coopCtx.sendCoop){
+    coopCtx.sendCoop({
+      type: 'syncAutomaticVolley',
+      ox: origin.x, oy: origin.y, oz: origin.z,
+      dirs: launchDirs.map(v => ({ x: v.x, y: v.y, z: v.z })),
+      targetIds,
+      isFighterPriority: isMultiBurst
     });
   }
 }
@@ -799,7 +989,7 @@ function updateHomingProjectiles(dt, eff, coopCtx){
     p.life -= dt;
 
     if(p.life <= 0){
-      state.scene.remove(p.mesh);
+      if(state.scene) state.scene.remove(p.mesh);
       combatState.homingProjectiles.splice(i, 1);
       continue;
     }
@@ -835,7 +1025,7 @@ function updateHomingProjectiles(dt, eff, coopCtx){
       p.pos.addScaledVector(p.vel, dt);
       p.mesh.position.copy(p.pos);
 
-      if(state.syncTick % 2 === 0){
+      if(state.syncTick % 2 === 0 && state.scene){
         const trail = new T.Mesh(
           new T.SphereGeometry(0.08, 5, 5),
           new T.MeshBasicMaterial({ color: 0xc77dff, transparent: true, opacity: 0.7 })
@@ -846,8 +1036,10 @@ function updateHomingProjectiles(dt, eff, coopCtx){
       }
 
       if(p.pos.distanceTo(targetCenter) <= 1.45){
-        dealHitToEnemy(p.targetEnemy, p.dmg, 0xc77dff, eff.scoreMult, coopCtx, false);
-        state.scene.remove(p.mesh);
+        if(p.dmg > 0){
+          dealHitToEnemy(p.targetEnemy, p.dmg, 0xc77dff, eff.scoreMult, coopCtx, false);
+        }
+        if(state.scene) state.scene.remove(p.mesh);
         combatState.homingProjectiles.splice(i, 1);
       }
     } else {
@@ -883,7 +1075,7 @@ function fireTurretHomingPulse(apexOrigin, turretAtk, eff, coopCtx){
     (Math.random() - 0.5) * 0.22
   );
   const aimPoint = targetCenter.clone().add(jitter);
-  spawnVisibleProjectileAndTrail(apexOrigin, aimPoint, 0x4de680, 0.85, 8);
+  spawnShortGradientProjectile(apexOrigin, aimPoint, 0x4de680, 0.85, coopCtx);
 
   dealHitToEnemy(bestEnemy, turretAtk, 0x4de680, eff.scoreMult, coopCtx, false);
 }
@@ -968,7 +1160,7 @@ export function shoot(coopCtx = {}){
 
   if(skin.attackType === 'automatic'){
     if(combatState.attackCooldownTimer > 0) return;
-    executeAutomaticVolley(skin, effectiveStats);
+    executeAutomaticVolley(skin, effectiveStats, coopCtx);
     return;
   }
 
@@ -1027,12 +1219,14 @@ export function updateCombatSystem(dt, coopCtx = {}){
 
   if(skin.attackType === 'laser'){
     updateChargeGauge(0);
+    showExplosionChargeMeter(false);
     const ds = combatState.laserDeployState;
     const isNeverStopper = (skin.skill.id === 'NeverStopper' && combatState.skillActiveTimer > 0);
     const radiusMult = isNeverStopper ? eff.neverStopperRadiusMult : 1.0;
 
     if(ds.isDeployedComplete){
       const aimPt = getCrosshairAimPoint();
+      const activeBeamSyncList = [];
 
       for(const lt of ds.turrets){
         lt.apexOrb.rotation.y += dt * 4;
@@ -1058,6 +1252,14 @@ export function updateCombatSystem(dt, coopCtx = {}){
           beamGrp.userData.muzzleSphere.position.set(0, -beamLen * 0.5, 0);
           beamGrp.userData.muzzleSphere.scale.setScalar(rScale);
 
+          activeBeamSyncList.push({
+            mkNumber: lt.mkNumber,
+            aimX: aimPt.x,
+            aimY: aimPt.y,
+            aimZ: aimPt.z,
+            radiusMult: rScale
+          });
+
           lt.tickTimer += dt;
           while(lt.tickTimer >= 0.1){
             lt.tickTimer -= 0.1;
@@ -1082,31 +1284,38 @@ export function updateCombatSystem(dt, coopCtx = {}){
           updateLaserAttackButtonState(lt.mkNumber, 'ready', 0);
         }
       }
+
+      if(coopCtx.isCoop && coopCtx.sendCoop && state.syncTick % 2 === 0){
+        coopCtx.sendCoop({
+          type: 'syncLaserBeams',
+          beams: activeBeamSyncList
+        });
+      }
     }
   } else if(skin.attackType === 'explosion'){
-    const reduction = (skin.skill.id === 'FewCharger' && combatState.skillActiveTimer > 0)
-      ? eff.fewChargerReduction
-      : 0;
-    const reqCharge = Math.max(0.05, skin.chargeTime - reduction);
+    updateChargeGauge(0);
+    showExplosionChargeMeter(true);
 
     if(combatState.isCharging){
       combatState.chargeElapsed += dt;
-      const ratio = Math.min(1, combatState.chargeElapsed / reqCharge);
-      updateChargeGauge(ratio, `CHARGING ${combatState.chargeElapsed.toFixed(1)}s / ${reqCharge.toFixed(1)}s`);
-      updateFireButtonUI(`溜め中\n${Math.round(ratio * 100)}%`, 'charging');
+      const { quantizedSec, isMax, maxChargeSec } = getExplosionEffectiveChargedSec(skin, eff);
+      if(combatState.chargeElapsed > maxChargeSec){
+        combatState.chargeElapsed = maxChargeSec;
+      }
 
-      if(combatState.chargeElapsed >= reqCharge){
-        combatState.isCharging = false;
-        combatState.chargeElapsed = 0;
-        updateChargeGauge(0);
-        executeExplosionAttack(skin, eff, coopCtx);
+      updateExplosionChargeMeter(quantizedSec, true, isMax, eff.bonusBlastRadiusM);
+      if(isMax){
+        updateFireButtonUI('MAX\n離して発射', 'charging');
+      } else {
+        updateFireButtonUI(`溜め中\n${quantizedSec.toFixed(1)}s`, 'charging');
       }
     } else {
-      updateChargeGauge(0);
-      updateFireButtonUI(`CHARGE\n${reqCharge.toFixed(1)}s`, '');
+      updateExplosionChargeMeter(0, false, false, eff.bonusBlastRadiusM);
+      updateFireButtonUI('CHARGE\nMAX 3.0s', '');
     }
   } else if(skin.attackType === 'scatter'){
     updateChargeGauge(0);
+    showExplosionChargeMeter(false);
     if(isInfinityActive){
       updateFireButtonUI('FREE\nFIRE!', 'infinity');
       if(combatState.fireHeld){
@@ -1126,6 +1335,7 @@ export function updateCombatSystem(dt, coopCtx = {}){
     }
   } else if(skin.attackType === 'automatic'){
     updateChargeGauge(0);
+    showExplosionChargeMeter(false);
     const isMultiBurst = (skin.skill.id === 'MultiBurst' && combatState.skillActiveTimer > 0);
     const totalVolley = eff.autoVolleyCount + (isMultiBurst ? eff.multiBurstExtraShots : 0);
     if(combatState.attackCooldownTimer > 0){
@@ -1133,11 +1343,12 @@ export function updateCombatSystem(dt, coopCtx = {}){
     } else {
       updateFireButtonUI(`AUTO\n×${totalVolley}`, isMultiBurst ? 'infinity' : '');
       if(combatState.fireHeld){
-        executeAutomaticVolley(skin, eff);
+        executeAutomaticVolley(skin, eff, coopCtx);
       }
     }
   } else if(skin.attackType === 'beast'){
     updateChargeGauge(0);
+    showExplosionChargeMeter(false);
     updateFireButtonUI('BEAST', '');
     if(combatState.fireHeld){
       combatState.autoFireTimer += dt;
@@ -1148,6 +1359,7 @@ export function updateCombatSystem(dt, coopCtx = {}){
     }
   } else {
     updateChargeGauge(0);
+    showExplosionChargeMeter(false);
     updateFireButtonUI(skin.attackType === 'wirbelwind' ? '4-QUAD' : 'PULSE', '');
   }
 
@@ -1161,7 +1373,7 @@ export function updateCombatSystem(dt, coopCtx = {}){
 
     if(tr.life <= 0){
       burst(tr.apexWorld, 0x4de680);
-      state.scene.remove(tr.mesh);
+      if(state.scene) state.scene.remove(tr.mesh);
       combatState.turrets.splice(i, 1);
       continue;
     }
@@ -1174,5 +1386,22 @@ export function updateCombatSystem(dt, coopCtx = {}){
       tr.fireTimer -= interval;
       fireTurretHomingPulse(tr.apexWorld, curAtk, eff, coopCtx);
     }
+  }
+
+  for(let i = combatState.remoteTurrets.length - 1; i >= 0; i--){
+    const rt = combatState.remoteTurrets[i];
+    rt.life -= dt;
+    rt.apexOrb.rotation.y += dt * 4;
+    rt.apexOrb.scale.setScalar(0.9 + Math.sin(state.syncTick * 0.35) * 0.2);
+    if(rt.life <= 0){
+      burst(rt.apexWorld, 0x38c8f0);
+      if(state.scene) state.scene.remove(rt.mesh);
+      combatState.remoteTurrets.splice(i, 1);
+    }
+  }
+
+  for(const rlt of combatState.remoteLaserState.turrets){
+    rlt.apexOrb.rotation.y += dt * 4;
+    rlt.apexOrb.scale.setScalar(0.95 + Math.sin(state.syncTick * 0.35 + rlt.mkNumber) * 0.2);
   }
 }

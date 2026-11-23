@@ -1,7 +1,7 @@
 import * as T from './libs/three.module.js';
 import { state } from './state.js';
-import { $, updateChargeGauge } from './ui.js';
-import { combatState, shoot, activateUnitSkill } from './player.js';
+import { $, updateChargeGauge, updateExplosionChargeMeter } from './ui.js';
+import { combatState, shoot, releaseExplosionCharge, activateUnitSkill } from './player.js';
 
 let stickId = null;
 let lookId = null;
@@ -10,7 +10,6 @@ let ly = 0;
 let lastTouchEndTime = 0;
 
 export function installTouchSelectionGuards(){
-  // iPad / iOS Safari の長押しコンテキストメニュー・青選択範囲・ダブルタップズーム・ピンチ拡大を無効化
   document.addEventListener('contextmenu', (e) => {
     const tag = e.target && e.target.tagName;
     if(tag !== 'INPUT' && tag !== 'TEXTAREA'){
@@ -57,6 +56,7 @@ export function resetMovementInputs(){
   combatState.isCharging = false;
   combatState.chargeElapsed = 0;
   updateChargeGauge(0);
+  updateExplosionChargeMeter(0, false, false, 0);
 }
 
 function setStick(cx, cy){
@@ -88,9 +88,7 @@ export function initInputControls(getCoopCtx){
     combatState.fireHeld = false;
     combatState.autoFireTimer = 0;
     if(combatState.isCharging){
-      combatState.isCharging = false;
-      combatState.chargeElapsed = 0;
-      updateChargeGauge(0);
+      releaseExplosionCharge(getCoopCtx());
     }
   };
 

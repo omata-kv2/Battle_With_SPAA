@@ -1,363 +1,358 @@
 import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
-import { state, getEquippedSkin, saveGameData } from './state.js';
-import { announce, airStrikeHud, triggerWhiteFadeOut, showEndScreen } from './ui.js';
-import { makeTarget, generateAirStrikeMissionData, buildAirStrikeStage } from './map-air-strike.js';
+import { state, getEquippedSkin, getEffectiveStats } from './state.js';
+import { announce, airStrikeHud, setModeUI, showToast, triggerWhiteFadeOut } from './ui.js';
 import { burst } from './enemies.js';
+import { buildAirStrikeWorld } from './map-air-strike.js';
 
-export { generateAirStrikeMissionData };
+export function generateAirStrikeMissionData(cfg, diffObj){
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 34 + Math.random() * 58;
+  const targetX = Math.cos(angle) * dist;
+  const targetZ = Math.sin(angle) * dist;
 
-function createExhaustFlameGroup(){
-  const flameGroup = new T.Group();
-  const outerCone = new T.Mesh(
-    new T.ConeGeometry(0.24, 1.15, 10),
-    new T.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.88 })
-  );
-  outerCone.position.y = 0.55;
-  flameGroup.add(outerCone);
+  const count = diffObj ? diffObj.obstacleCount : 24;
+  const shapes = ['box', 'cylinder', 'ring', 'cross', 'blade'];
+  const obstacles = [];
 
-  const innerCone = new T.Mesh(
-    new T.ConeGeometry(0.13, 0.75, 8),
-    new T.MeshBasicMaterial({ color: 0xfff3b0, transparent: true, opacity: 0.96 })
-  );
-  innerCone.position.y = 0.38;
-  flameGroup.add(innerCone);
+  for(let i = 0; i < count; i++){
+    const t = 0.14 + (i / Math.max(1, count)) * 0.76 + (Math.random() - 0.5) * 0.06;
+    const clampedT = Math.max(0.12, Math.min(0.92, t));
+    const py = cfg.AIR_STRIKE.START_Y * (1 - clampedT) + 2.5;
+    const baseAxisX = targetX * clampedT;
+    const baseAxisZ = targetZ * clampedT;
+    const spreadR = 6 + (1 - clampedT) * 26;
+    const ang = Math.random() * Math.PI * 2;
+    const rad = (0.18 + Math.random() * 0.82) * spreadR;
 
-  flameGroup.rotation.x = -Math.PI / 2;
-  flameGroup.userData.outerCone = outerCone;
-  flameGroup.userData.innerCone = innerCone;
-  return flameGroup;
+    const px = baseAxisX + Math.cos(ang) * rad;
+    const pz = baseAxisZ + Math.sin(ang) * rad;
+
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    const size = 2.6 + Math.random() * 4.4;
+    const rotSpeedX = (Math.random() - 0.5) * 1.4;
+    const rotSpeedY = (Math.random() - 0.5) * 1.8;
+    const rotSpeedZ = (Math.random() - 0.5) * 1.4;
+    const moveAmp = Math.random() < 0.45 ? (1.8 + Math.random() * 4.2) : 0;
+    const moveFreq = 0.8 + Math.random() * 1.6;
+    const movePhase = Math.random() * Math.PI * 2;
+
+    obstacles.push({
+      shape,
+      x: px,
+      y: py,
+      z: pz,
+      size,
+      rotSpeedX,
+      rotSpeedY,
+      rotSpeedZ,
+      moveAmp,
+      moveFreq,
+      movePhase
+    });
+  }
+
+  return {
+    targetX,
+    targetZ,
+    obstacles
+  };
 }
 
 export function createAirStrikePlayerActor(isRemote = false, labelName = '', makeTextSpriteFn = null){
   const root = new T.Group();
 
-  const jetTemplate = state.modelTemplates.fighter || makeTarget(T);
-  const jetMesh = jetTemplate.clone(true);
-  jetMesh.scale.multiplyScalar(1.35);
-  root.add(jetMesh);
+  const jetGroup = new T.Group();
+  if(state.modelTemplates.fighter){
+    const jetClone = state.modelTemplates.fighter.clone(true);
+    jetClone.scale.setScalar(1.35);
+    jetGroup.add(jetClone);
+  } else {
+    const body = new T.Mesh(
+      new T.ConeGeometry(0.9, 4.2, 6),
+      new T.MeshStandardMaterial({ color: isRemote ? 0x3b82f6 : 0x64748b, metalness: 0.7, roughness: 0.3 })
+    );
+    body.rotation.x = Math.PI / 2;
+    jetGroup.add(body);
+  }
+  jetGroup.position.set(0, 1.35, 0);
+  root.add(jetGroup);
 
   const missileHolder = new T.Group();
-  const missileTemplate = state.modelTemplates.missile || makeTarget(T);
-  const missileMesh = missileTemplate.clone(true);
-  missileMesh.scale.multiplyScalar(1.2);
-  missileHolder.add(missileMesh);
+  if(state.modelTemplates.missile){
+    const mClone = state.modelTemplates.missile.clone(true);
+    mClone.scale.setScalar(0.95);
+    missileHolder.add(mClone);
+  } else {
+    const mBody = new T.Mesh(
+      new T.CylinderGeometry(0.24, 0.28, 2.8, 12),
+      new T.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.25 })
+    );
+    const nose = new T.Mesh(
+      new T.ConeGeometry(0.24, 0.7, 12),
+      new T.MeshBasicMaterial({ color: 0xff4d6d })
+    );
+    nose.position.y = -1.75;
+    nose.rotation.x = Math.PI;
+    missileHolder.add(mBody, nose);
+  }
+  missileHolder.position.set(0, 0.25, 0);
+  root.add(missileHolder);
 
-  const flameGroup = createExhaustFlameGroup();
-  flameGroup.position.set(0, 0, -0.95);
+  const flameGroup = new T.Group();
+  const outerFlame = new T.Mesh(
+    new T.ConeGeometry(0.32, 1.5, 10),
+    new T.MeshBasicMaterial({ color: 0xff6b00, transparent: true, opacity: 0.85 })
+  );
+  outerFlame.position.set(0, 1.85, 0);
+  const innerFlame = new T.Mesh(
+    new T.ConeGeometry(0.16, 0.95, 8),
+    new T.MeshBasicMaterial({ color: 0xfff066, transparent: true, opacity: 0.95 })
+  );
+  innerFlame.position.set(0, 1.6, 0);
+  flameGroup.add(outerFlame, innerFlame);
   flameGroup.visible = false;
   missileHolder.add(flameGroup);
 
-  missileHolder.position.set(0, -1.1, 0);
-  root.add(missileHolder);
-
   let nameSprite = null;
   if(isRemote && makeTextSpriteFn){
-    nameSprite = makeTextSpriteFn(T, labelName || 'フレンド');
+    nameSprite = makeTextSpriteFn(T, labelName || '僚機', 'rgba(10,30,45,0.85)', '#38c8f0');
     nameSprite.position.set(0, 2.2, 0);
     root.add(nameSprite);
   }
 
   state.scene.add(root);
-  return { root, jetMesh, missileHolder, flameGroup, nameSprite };
+  return {
+    root,
+    jetGroup,
+    missileHolder,
+    flameGroup,
+    nameSprite,
+    jetDetached: false,
+    jetVel: new T.Vector3(0, 0.15, -0.75)
+  };
 }
 
-export function startAirStrikeBattle(sharedMissionData = null, coopCtx = {}, initRemoteCraftFn = null){
-  const missionData = sharedMissionData || generateAirStrikeMissionData(CONFIG, state.activeDifficulty);
-  const targetPos = missionData.targetPos;
-  const obstacles = missionData.obstacles;
-  const stageObjs = buildAirStrikeStage(T, state.scene, state.activeDifficulty, obstacles, targetPos);
+export function initAirStrikeMode(missionData, coopCtx = {}){
+  state.activeBattleMode = 'AIR_STRIKE';
+  state.score = 0;
+  state.earnedGoldInMatch = 0;
+  state.wave = 1;
+  state.peace = 100;
 
-  const spawnX = coopCtx.isCoop ? (coopCtx.isHost ? -4.0 : 4.0) : 0.0;
+  const diffObj = state.activeDifficulty || CONFIG.DIFFICULTIES[0];
+  const data = missionData || generateAirStrikeMissionData(CONFIG, diffObj);
+
+  const worldRefs = buildAirStrikeWorld(T, state.scene, diffObj, data);
+
+  const spawnX = coopCtx.isCoop ? (coopCtx.isHost ? -4.0 : 4.0) : 0;
   const spawnY = CONFIG.AIR_STRIKE.START_Y;
-  const spawnZ = 0.0;
+  const spawnZ = 0;
 
   state.x = spawnX;
   state.y = spawnY;
   state.z = spawnZ;
-  state.yaw = Math.atan2(spawnX - targetPos.x, spawnZ - targetPos.z);
-  state.pitch = 0.46;
+  state.yaw = Math.atan2(-data.targetX, -data.targetZ);
+  state.pitch = -0.35;
 
-  const myActor = createAirStrikePlayerActor(false, state.username);
-  myActor.root.position.set(state.x, state.y, state.z);
-
-  if(coopCtx.isCoop && initRemoteCraftFn){
-    initRemoteCraftFn(spawnY, spawnZ);
-  }
+  const localActor = createAirStrikePlayerActor(false);
+  localActor.root.position.set(spawnX, spawnY, spawnZ);
 
   state.airStrikeState = {
     phase: 'countdown',
-    elapsed: 0,
-    flightTime: 0,
-    jetPos: new T.Vector3(spawnX, spawnY, spawnZ),
-    targetPos,
-    myActor,
-    obstacles,
-    obstacleMeshes: stageObjs.obstacleMeshes,
-    targetGroup: stageObjs.targetGroup,
+    countdownTimer: CONFIG.AIR_STRIKE.LAUNCH_DELAY_SEC,
+    altitudeM: CONFIG.AIR_STRIKE.START_ALTITUDE_M,
     survivedM: 0,
-    hitTarget: false,
-    crashed: false,
-    finishReason: ''
+    targetX: data.targetX,
+    targetZ: data.targetZ,
+    obstacles: worldRefs.obstacles,
+    beacon: worldRefs.beacon,
+    localActor,
+    localFinished: false,
+    localHitTarget: false,
+    localFinalScore: 0,
+    elapsedTime: 0
   };
 
-  announce(`【AIR STRIKE - ${state.activeDifficulty.name}】発射まで 3... ランダム目標を探せ！`);
-  airStrikeHud(CONFIG.AIR_STRIKE.START_ALTITUDE_M, 0, 0);
+  const skin = getEquippedSkin();
+  setModeUI('battle', skin, coopCtx.isCoop, coopCtx.isHost, 'AIR_STRIKE');
+  announce('AIR STRIKE — 戦闘機発進準備中… 3秒後にミサイル切り離し！');
+  airStrikeHud(100, 0, 0);
 }
 
-function updateAirStrikeDynamicObstacles(dt, totalTime){
-  if(!state.airStrikeState) return;
-  const { obstacles, obstacleMeshes } = state.airStrikeState;
+export function updateAirStrikeMode(dt, coopCtx = {}, finishBattleCb = null){
+  const as = state.airStrikeState;
+  if(!as) return;
 
-  for(let i = 0; i < obstacles.length; i++){
-    const obs = obstacles[i];
-    const mesh = obstacleMeshes[i];
+  as.elapsedTime += dt;
 
-    if(obs.rotSpeedY){
-      obs.ry = (obs.ry || 0) + obs.rotSpeedY * dt;
-    }
-
-    if(obs.moveType === 'slide'){
-      const offset = Math.sin(totalTime * obs.moveSpeed + (obs.movePhase || 0)) * obs.moveAmp;
-      obs.px = obs.baseX + (obs.moveDirX || 1) * offset;
-      obs.pz = obs.baseZ + (obs.moveDirZ || 0) * offset;
-    } else if(obs.moveType === 'orbit'){
-      const a = totalTime * obs.moveSpeed + (obs.movePhase || 0);
-      obs.px = obs.baseX + Math.cos(a) * obs.orbitRadius;
-      obs.pz = obs.baseZ + Math.sin(a) * obs.orbitRadius;
-    }
-
-    if(mesh){
-      mesh.position.set(obs.px, obs.py, obs.pz);
-      mesh.rotation.set(obs.rx || 0, obs.ry || 0, obs.rz || 0);
-    }
-  }
-}
-
-function checkRodSegmentHit(px, py, pz, cx, cy, cz, rx, ry, rz, length, radius, missileRadius){
-  const euler = new T.Euler(rx || 0, ry || 0, rz || 0, 'XYZ');
-  const axis = new T.Vector3(0, 1, 0).applyEuler(euler).normalize();
-  const halfLen = length * 0.5;
-  const p0 = new T.Vector3(cx, cy, cz).addScaledVector(axis, -halfLen);
-  const p1 = new T.Vector3(cx, cy, cz).addScaledVector(axis, halfLen);
-  const pt = new T.Vector3(px, py, pz);
-
-  const seg = p1.clone().sub(p0);
-  const lenSq = seg.lengthSq() || 1;
-  const t = T.MathUtils.clamp(pt.clone().sub(p0).dot(seg) / lenSq, 0, 1);
-  const closest = p0.addScaledVector(seg, t);
-
-  return pt.distanceTo(closest) <= radius + missileRadius;
-}
-
-function checkAirStrikeCollision(px, py, pz, obstacles){
-  const missileRadius = 0.52;
-
-  for(const obs of obstacles){
-    if(Math.abs(py - obs.py) > 6.5) continue;
-
-    if(obs.kind === 'sphere'){
-      if(Math.hypot(px - obs.px, py - obs.py, pz - obs.pz) < obs.r + missileRadius) return obs;
-    } else if(obs.kind === 'box'){
-      const dx = px - obs.px;
-      const dy = py - obs.py;
-      const dz = pz - obs.pz;
-      const ry = -(obs.ry || 0);
-      const cosY = Math.cos(ry);
-      const sinY = Math.sin(ry);
-      const lx = dx * cosY - dz * sinY;
-      const lz = dx * sinY + dz * cosY;
-
-      if(Math.abs(lx) <= obs.sx * 0.5 + missileRadius && Math.abs(dy) <= obs.sy * 0.5 + missileRadius && Math.abs(lz) <= obs.sz * 0.5 + missileRadius){
-        return obs;
-      }
-    } else if(obs.kind === 'rod'){
-      if(checkRodSegmentHit(px, py, pz, obs.px, obs.py, obs.pz, obs.rx, obs.ry, obs.rz, obs.length, obs.radius, missileRadius)){
-        return obs;
-      }
-    } else if(obs.kind === 'cross'){
-      const ry = obs.ry || 0;
-      if(checkRodSegmentHit(px, py, pz, obs.px, obs.py, obs.pz, 0, ry, Math.PI / 2, obs.length, obs.radius, missileRadius)) return obs;
-      if(checkRodSegmentHit(px, py, pz, obs.px, obs.py, obs.pz, Math.PI / 2, ry, 0, obs.length, obs.radius, missileRadius)) return obs;
-    } else if(obs.kind === 'ring'){
-      if(Math.abs(py - obs.py) <= obs.tubeThickness * 0.5 + missileRadius){
-        const radialDist = Math.hypot(px - obs.px, pz - obs.pz);
-        const halfTube = obs.tubeThickness * 0.5 + missileRadius;
-        if(Math.abs(radialDist - obs.ringRadius) <= halfTube) return obs;
-      }
-    }
-  }
-  return null;
-}
-
-export function updateAirStrikeFrame(dt, coopCtx = {}){
-  if(!state.airStrikeState) return;
-  const st = state.airStrikeState;
-
-  st.flightTime += dt;
-  updateAirStrikeDynamicObstacles(dt, st.flightTime);
-
-  if(st.targetGroup){
-    st.targetGroup.rotation.y += dt * 1.6;
+  if(as.beacon){
+    as.beacon.ringOuter.rotation.z += dt * 1.6;
+    as.beacon.ringInner.rotation.z -= dt * 2.4;
+    as.beacon.pillar.material.opacity = 0.16 + Math.sin(as.elapsedTime * 5) * 0.08;
   }
 
-  const f = (state.keys.KeyW || state.keys.ArrowUp ? 1 : 0) - (state.keys.KeyS || state.keys.ArrowDown ? 1 : 0) - state.move.y;
-  const s = (state.keys.KeyD || state.keys.ArrowRight ? 1 : 0) - (state.keys.KeyA || state.keys.ArrowLeft ? 1 : 0) + state.move.x;
-  const forward = new T.Vector3(0, 0, -1).applyAxisAngle(new T.Vector3(0, 1, 0), state.yaw);
-  const right = new T.Vector3(1, 0, 0).applyAxisAngle(new T.Vector3(0, 1, 0), state.yaw);
+  for(const ob of as.obstacles){
+    ob.mesh.rotation.x += ob.rotSpeedX * dt;
+    ob.mesh.rotation.y += ob.rotSpeedY * dt;
+    ob.mesh.rotation.z += ob.rotSpeedZ * dt;
+    if(ob.moveAmp > 0){
+      ob.mesh.position.x = ob.baseX + Math.sin(as.elapsedTime * ob.moveFreq + ob.movePhase) * ob.moveAmp;
+    }
+  }
+
+  const actor = as.localActor;
+
+  if(as.phase === 'countdown'){
+    as.countdownTimer = Math.max(0, as.countdownTimer - dt);
+    const secStr = Math.ceil(as.countdownTimer);
+    announce(`切り離しまで ${secStr} 秒… 目標地点（光柱）を確認せよ！`);
+
+    state.x += Math.sin(state.yaw) * -4.0 * dt;
+    state.z += Math.cos(state.yaw) * -4.0 * dt;
+    actor.root.position.set(state.x, state.y, state.z);
+    actor.jetGroup.rotation.y = state.yaw;
+    actor.missileHolder.rotation.y = state.yaw;
+
+    if(as.countdownTimer <= 0){
+      as.phase = 'flying';
+      actor.jetDetached = true;
+      actor.flameGroup.visible = true;
+      burst(new T.Vector3(state.x, state.y + 0.5, state.z), 0xff9233);
+      announce('ミサイル発射！スティック・視点操作で障害物を回避し、目標へ着弾させろ！');
+    }
+  } else if(as.phase === 'flying'){
+    if(actor.jetDetached){
+      actor.jetGroup.position.y += 6.5 * dt;
+      actor.jetGroup.position.z -= 18.0 * dt;
+    }
+
+    const skin = getEquippedSkin();
+    const eff = getEffectiveStats(skin);
+    const steerSpeed = 24.0 * (skin.stats.moveMult || 1.0);
+
+    const mx = (state.keys.KeyD || state.keys.ArrowRight ? 1 : 0) - (state.keys.KeyA || state.keys.ArrowLeft ? 1 : 0) + state.move.x;
+    const mz = (state.keys.KeyS || state.keys.ArrowDown ? 1 : 0) - (state.keys.KeyW || state.keys.ArrowUp ? 1 : 0) + state.move.y;
+
+    const fwdX = -Math.sin(state.yaw);
+    const fwdZ = -Math.cos(state.yaw);
+    const rightX = Math.cos(state.yaw);
+    const rightZ = -Math.sin(state.yaw);
+
+    const forwardInput = -mz;
+    const baseCruise = 11.5;
+    const totalFwd = baseCruise + forwardInput * steerSpeed * 0.75;
+    const totalRight = mx * steerSpeed;
+
+    state.x += (fwdX * totalFwd + rightX * totalRight) * dt;
+    state.z += (fwdZ * totalFwd + rightZ * totalRight) * dt;
+
+    state.x = T.MathUtils.clamp(state.x, -125, 125);
+    state.z = T.MathUtils.clamp(state.z, -125, 125);
+
+    const speedMult = (state.activeDifficulty && state.activeDifficulty.speedMult) ? state.activeDifficulty.speedMult : 1.0;
+    const descentRateWorld = (CONFIG.AIR_STRIKE.DESCENT_SPEED_MPS * 0.5) * (0.85 + speedMult * 0.25);
+    state.y = Math.max(0, state.y - descentRateWorld * dt);
+
+    as.altitudeM = Math.max(0, (state.y / CONFIG.AIR_STRIKE.START_Y) * CONFIG.AIR_STRIKE.START_ALTITUDE_M);
+    as.survivedM = Math.min(100, Math.max(0, Math.round(CONFIG.AIR_STRIKE.START_ALTITUDE_M - as.altitudeM)));
+    const liveScore = Math.round(as.survivedM * CONFIG.AIR_STRIKE.SCORE_PER_METER * eff.scoreMult);
+
+    airStrikeHud(as.altitudeM, as.survivedM, liveScore);
+
+    actor.root.position.set(state.x, state.y, state.z);
+    actor.missileHolder.position.set(0, 0, 0);
+    actor.missileHolder.rotation.y = state.yaw;
+    actor.missileHolder.rotation.z = T.MathUtils.clamp(-mx * 0.45, -0.55, 0.55);
+    actor.missileHolder.rotation.x = T.MathUtils.clamp(forwardInput * 0.35 - 0.18, -0.55, 0.45);
+    actor.flameGroup.scale.setScalar(0.85 + Math.sin(as.elapsedTime * 35) * 0.22);
+
+    const missilePos = new T.Vector3(state.x, state.y, state.z);
+    for(const ob of as.obstacles){
+      if(missilePos.distanceTo(ob.mesh.position) <= (ob.hitRadius + 0.65)){
+        burst(missilePos, 0xff4d6d);
+        completeLocalAirStrike(false, as.survivedM, coopCtx, finishBattleCb);
+        return;
+      }
+    }
+
+    if(state.y <= 0.15){
+      const distToTarget = Math.hypot(state.x - as.targetX, state.z - as.targetZ);
+      if(distToTarget <= CONFIG.AIR_STRIKE.TARGET_RADIUS){
+        burst(missilePos, 0x00f5d4);
+        burst(missilePos, 0xffd23f);
+        completeLocalAirStrike(true, 100, coopCtx, finishBattleCb);
+      } else {
+        burst(missilePos, 0xff4d6d);
+        completeLocalAirStrike(false, 100, coopCtx, finishBattleCb);
+      }
+      return;
+    }
+  }
+
+  const camDist = CONFIG.AIR_STRIKE.CAM_RADIUS;
+  const cx = state.x + Math.sin(state.yaw) * Math.cos(state.pitch) * camDist;
+  const cy = Math.max(0.8, state.y - Math.sin(state.pitch) * camDist + 1.2);
+  const cz = state.z + Math.cos(state.yaw) * Math.cos(state.pitch) * camDist;
+
+  state.camera.position.set(cx, cy, cz);
+  state.camera.lookAt(state.x, Math.max(0, state.y - 0.5), state.z);
+}
+
+function completeLocalAirStrike(hitTarget, survivedM, coopCtx, finishBattleCb){
+  const as = state.airStrikeState;
+  if(!as || as.localFinished) return;
+
+  as.localFinished = true;
+  as.localHitTarget = hitTarget;
+  as.survivedM = survivedM;
+  as.phase = 'finished';
+  as.localActor.flameGroup.visible = false;
 
   const skin = getEquippedSkin();
-  const horizSpeed = 12.2 * skin.stats.moveMult;
-  const vx = (forward.x * f + right.x * s) * horizSpeed;
-  const vz = (forward.z * f + right.z * s) * horizSpeed;
+  const eff = getEffectiveStats(skin);
+  const basePts = survivedM * CONFIG.AIR_STRIKE.SCORE_PER_METER;
+  const clearBonus = hitTarget ? 1000 : 0;
+  as.localFinalScore = Math.round((basePts + clearBonus) * eff.scoreMult);
 
-  if(st.phase === 'countdown'){
-    st.elapsed += dt;
-    const remain = Math.max(0, CONFIG.AIR_STRIKE.LAUNCH_DELAY_SEC - st.elapsed);
-    announce(`【AIR STRIKE】発射まで ${Math.ceil(remain)} 秒...（目標を探して位置調整）`);
-
-    state.x = T.MathUtils.clamp(state.x + vx * dt, -26, 26);
-    state.z = T.MathUtils.clamp(state.z + vz * dt, -26, 26);
-    state.y = CONFIG.AIR_STRIKE.START_Y;
-    st.jetPos.set(state.x, state.y, state.z);
-
-    st.myActor.root.position.set(state.x, state.y, state.z);
-    st.myActor.jetMesh.rotation.y = state.yaw;
-    st.myActor.missileHolder.position.set(0, -1.15, 0);
-    st.myActor.missileHolder.lookAt(state.x, state.y - 10, state.z);
-
-    airStrikeHud(100, 0, 0);
-
-    if(st.elapsed >= CONFIG.AIR_STRIKE.LAUNCH_DELAY_SEC){
-      st.phase = 'flying';
-      state.y = CONFIG.AIR_STRIKE.START_Y - 1.2;
-      st.myActor.flameGroup.visible = true;
-      burst(new T.Vector3(state.x, state.y + 0.8, state.z), 0xffaa00);
-      announce('MISSILE LAUNCH! 複雑障害物を避けて地上目標へ誘導せよ！');
-    }
-  } else if(st.phase === 'flying'){
-    const vyUnits = -(CONFIG.AIR_STRIKE.DESCENT_SPEED_MPS * 0.5);
-    state.x = T.MathUtils.clamp(state.x + vx * dt, -28, 28);
-    state.z = T.MathUtils.clamp(state.z + vz * dt, -28, 28);
-    state.y = Math.max(0, state.y + vyUnits * dt);
-
-    st.jetPos.z -= 1.5 * dt;
-    st.myActor.jetMesh.position.set(st.jetPos.x - state.x, st.jetPos.y - state.y, st.jetPos.z - state.z);
-
-    st.myActor.root.position.set(state.x, state.y, state.z);
-    st.myActor.missileHolder.position.set(0, 0, 0);
-    st.myActor.missileHolder.lookAt(state.x + vx * 0.35, state.y + vyUnits * 1.2, state.z + vz * 0.35);
-
-    const flicker = 0.8 + Math.random() * 0.55;
-    st.myActor.flameGroup.scale.set(1, 1, flicker);
-    if(state.syncTick % 2 === 0){
-      st.myActor.missileHolder.updateMatrixWorld(true);
-      const exhaustPos = st.myActor.missileHolder.localToWorld(new T.Vector3(0, 0, -0.95));
-      const pMesh = new T.Mesh(
-        new T.SphereGeometry(0.16, 6, 5),
-        new T.MeshBasicMaterial({ color: Math.random() < 0.5 ? 0xff6b00 : 0xffd166 })
-      );
-      pMesh.position.copy(exhaustPos);
-      state.scene.add(pMesh);
-      state.fx.push({
-        m: pMesh,
-        life: 14,
-        v: new T.Vector3((Math.random() - 0.5) * 0.06, 0.14 + Math.random() * 0.08, (Math.random() - 0.5) * 0.06)
-      });
-    }
-
-    const currentAltM = Math.max(0, Math.min(100, state.y * 2));
-    st.survivedM = Math.max(0, Math.min(100, Math.round(100 - currentAltM)));
-    const liveScore = CONFIG.AIR_STRIKE.SCORE_PER_METER * st.survivedM;
-    airStrikeHud(currentAltM, st.survivedM, liveScore);
-
-    const hitObs = checkAirStrikeCollision(state.x, state.y, state.z, st.obstacles);
-    if(hitObs){
-      st.phase = 'finished';
-      st.crashed = true;
-      st.finishReason = `障害物に衝突！（高度 ${Math.round(currentAltM)}m / 生き残り ${st.survivedM}m）`;
-      st.myActor.flameGroup.visible = false;
-      st.myActor.missileHolder.visible = false;
-      burst(new T.Vector3(state.x, state.y, state.z), 0xff3300);
-      onAirStrikeLocalComplete(coopCtx);
-      return;
-    }
-
-    if(state.y <= 0.5){
-      st.phase = 'finished';
-      st.survivedM = 100;
-      const distToTarget = Math.hypot(state.x - st.targetPos.x, state.z - st.targetPos.z);
-      st.hitTarget = distToTarget <= CONFIG.AIR_STRIKE.TARGET_RADIUS;
-      st.finishReason = st.hitTarget
-        ? `地上目標に直撃成功！（生き残り 100m）`
-        : `地上着弾（目標から ${Math.round(distToTarget * 2)}m 逸脱 / 生き残り 100m）`;
-      st.myActor.flameGroup.visible = false;
-      st.myActor.missileHolder.visible = false;
-      burst(new T.Vector3(state.x, 0.6, state.z), st.hitTarget ? 0x00f5d4 : 0xffaa00);
-      onAirStrikeLocalComplete(coopCtx);
-      return;
-    }
-  }
-
-  let focusX = state.x, focusY = state.y, focusZ = state.z;
-  if(st.phase === 'finished' && coopCtx.isCoop && coopCtx.remotePos && !coopCtx.remotePos.airStrikeFinished){
-    focusX = coopCtx.remotePos.x;
-    focusY = coopCtx.remotePos.y;
-    focusZ = coopCtx.remotePos.z;
-  }
-
-  const orbitRadius = CONFIG.AIR_STRIKE.CAM_RADIUS;
-  const elev = T.MathUtils.clamp(state.pitch, -1.48, 1.48);
-  const horizDist = Math.cos(elev) * orbitRadius;
-  const vertOffset = Math.sin(elev) * orbitRadius;
-
-  state.camera.position.set(
-    focusX + Math.sin(state.yaw) * horizDist,
-    Math.max(0.45, focusY + vertOffset),
-    focusZ + Math.cos(state.yaw) * horizDist
-  );
-  state.camera.lookAt(focusX, focusY, focusZ);
-}
-
-export function onAirStrikeLocalComplete(coopCtx = {}){
-  if(!state.airStrikeState) return;
-  const finalScore = CONFIG.AIR_STRIKE.SCORE_PER_METER * state.airStrikeState.survivedM;
-  state.score = finalScore;
-  state.earnedGoldInMatch = finalScore;
+  state.score = as.localFinalScore;
+  state.earnedGoldInMatch = as.localFinalScore;
 
   if(coopCtx.isCoop && coopCtx.sendCoop){
     coopCtx.sendCoop({
-      type: 'airStrikeDone',
-      survivedM: state.airStrikeState.survivedM,
-      hitTarget: state.airStrikeState.hitTarget,
-      score: finalScore
+      type: 'airStrikeFinished',
+      survivedM,
+      hitTarget,
+      score: as.localFinalScore
     });
-    if(coopCtx.remotePos && !coopCtx.remotePos.airStrikeFinished){
-      announce(`${state.airStrikeState.finishReason} — フレンドの降下完了を待機中...`);
+
+    if(!coopCtx.remotePos.airStrikeFinished){
+      announce(hitTarget
+        ? '目標着弾成功！フレンドの降下完了を待機中…'
+        : `墜落（記録: ${survivedM}m）… フレンドの降下完了を待機中…`);
+      showToast('フレンドの降下完了を待っています…');
       return;
     }
   }
 
-  finalizeAirStrikeResult(coopCtx.isCoop);
+  finalizeAirStrikeResult(coopCtx, finishBattleCb);
 }
 
-export function finalizeAirStrikeResult(isCoop = false){
-  if(!state.airStrikeState || state.gameMode === 'end') return;
-  state.gameMode = 'end';
-  const mySurvived = state.airStrikeState.survivedM;
-  const myScore = CONFIG.AIR_STRIKE.SCORE_PER_METER * mySurvived;
-  state.score = myScore;
-  state.earnedGoldInMatch = myScore;
-  state.gold += state.earnedGoldInMatch;
-  saveGameData();
+export function finalizeAirStrikeResult(coopCtx, finishBattleCb){
+  const as = state.airStrikeState;
+  if(!as) return;
 
-  const win = state.airStrikeState.hitTarget;
-  const detail = state.airStrikeState.finishReason;
-  if(win){
+  const anyWin = coopCtx.isCoop
+    ? (as.localHitTarget || !!coopCtx.remotePos.airStrikeHitTarget)
+    : as.localHitTarget;
+
+  if(anyWin){
+    announce('TARGET DESTROYED! 目標着弾成功！');
     triggerWhiteFadeOut(() => {
-      showEndScreen(true, state.score, state.earnedGoldInMatch, isCoop, detail);
+      if(finishBattleCb) finishBattleCb(true);
     });
   } else {
-    showEndScreen(false, state.score, state.earnedGoldInMatch, isCoop, detail);
+    announce('IMPACT FAILED — 目標外への着弾または障害物衝突');
+    if(finishBattleCb) finishBattleCb(false);
   }
 }

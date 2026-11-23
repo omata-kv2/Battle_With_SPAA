@@ -267,6 +267,110 @@ header.battle-only{
 .charge-bar{width:100%;height:6px;background:#0c253b;border-radius:999px;overflow:hidden}
 #chargeGaugeFill{width:0%;height:100%;background:linear-gradient(90deg,#ff9233,#ffd23f)}
 
+/* Explosion専用 画面右端中央チャージメーター（0.0s〜3.0s / 0.1刻み） */
+#explosionChargeMeter{
+  position:fixed;
+  right:max(14px,env(safe-area-inset-right));
+  top:46%;
+  transform:translateY(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  z-index:18;
+  pointer-events:none;
+}
+.exp-meter-readout{
+  font-size:11px;
+  font-weight:900;
+  color:#fff;
+  text-shadow:0 1px 4px rgba(0,0,0,.95);
+  letter-spacing:.03em;
+}
+.exp-meter-frame{
+  position:relative;
+  width:34px;
+  height:186px;
+  border:2.5px solid #090d12;
+  border-radius:8px;
+  background:transparent;
+  overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.22), inset 0 0 6px rgba(0,0,0,.35);
+  transition:box-shadow .18s ease, border-color .18s ease;
+}
+.exp-meter-frame.max-charged{
+  border-color:#261215;
+  box-shadow:0 0 10px rgba(255,95,95,.65), 0 0 18px rgba(255,190,170,.35), inset 0 0 6px rgba(255,120,120,.4);
+  animation:expMeterSubtleGlow 1.1s ease-in-out infinite alternate;
+}
+@keyframes expMeterSubtleGlow{
+  from{
+    box-shadow:0 0 7px rgba(255,80,80,.48), 0 0 13px rgba(255,180,160,.24);
+  }
+  to{
+    box-shadow:0 0 13px rgba(255,110,110,.82), 0 0 22px rgba(255,210,190,.48);
+  }
+}
+.exp-meter-liquid{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:0%;
+  background:linear-gradient(180deg, rgba(255,92,92,.88) 0%, rgba(224,24,42,.92) 38%, rgba(145,10,24,.96) 100%);
+  transition:height .04s linear;
+}
+.exp-meter-meniscus{
+  position:absolute;
+  top:0;
+  left:-10%;
+  width:120%;
+  height:4px;
+  background:rgba(255,215,215,.85);
+  box-shadow:0 0 6px rgba(255,120,120,.9);
+  animation:expWaterWave .9s ease-in-out infinite alternate;
+}
+@keyframes expWaterWave{
+  from{transform:translateX(-3px) scaleY(.9)}
+  to{transform:translateX(3px) scaleY(1.15)}
+}
+.exp-meter-ticks{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+.exp-tick{
+  position:absolute;
+  right:0;
+  height:1px;
+  background:rgba(10,14,20,.78);
+  box-shadow:0 0 1px rgba(255,255,255,.45);
+}
+.exp-tick.minor{
+  width:7px;
+}
+.exp-tick.major{
+  width:13px;
+  height:1.5px;
+  background:#090d12;
+}
+.exp-tick-label{
+  position:absolute;
+  left:3px;
+  transform:translateY(50%);
+  font-size:8px;
+  font-weight:800;
+  color:#eaf8ff;
+  text-shadow:0 1px 2px #000, 0 0 3px #000;
+  line-height:1;
+}
+.exp-meter-radius{
+  font-size:10px;
+  font-weight:800;
+  color:#ff9e7d;
+  text-shadow:0 1px 4px rgba(0,0,0,.95);
+}
+
 /* コントロール（移動スティック & 射撃・固有能力ボタン） */
 #controls{
   position:fixed;
@@ -388,6 +492,26 @@ header.battle-only{
   font-size:12px;
 }
 
+/* 待機パルスバー */
+.wait-pulse-bar{
+  width:100%;
+  height:8px;
+  border-radius:999px;
+  background:#0a2236;
+  overflow:hidden;
+  margin:12px 0;
+}
+.wait-pulse-fill{
+  width:45%;
+  height:100%;
+  background:linear-gradient(90deg,var(--accent2),var(--accent));
+  border-radius:999px;
+  animation:waitSlide 1.2s ease-in-out infinite alternate;
+}
+@keyframes waitSlide{
+  from{transform:translateX(0%)}
+  to{transform:translateX(122%)}
+}
 
 /* ホワイトアウト・スタート・モーダル・リザルト */
 #whiteFadeOverlay{

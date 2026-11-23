@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#071522">
-<title>Cooking With SPAA v4.9</title>
+<title>Cooking With SPAA v5.0</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
@@ -55,10 +55,22 @@
     <div id="announce" class="battle-only hidden-mode">WORLD PEACE DEFENSE SYSTEM</div>
     <div id="reticle" class="battle-only hidden-mode">+</div>
 
-    <!-- Explosion チャージ / Laser 照射ゲージ -->
+    <!-- 汎用チャージゲージ（非Explosion用予備） -->
     <div id="chargeGaugeWrap" class="hidden">
       <div id="chargeLabel" class="charge-label">CHARGING…</div>
       <div class="charge-bar"><div id="chargeGaugeFill"></div></div>
+    </div>
+
+    <!-- Explosion専用 画面右端中央チャージメーター（0.0s〜3.0s / 0.1刻み） -->
+    <div id="explosionChargeMeter" class="hidden" aria-label="Explosionチャージメーター">
+      <div class="exp-meter-readout" id="expMeterReadout">0.0s</div>
+      <div class="exp-meter-frame" id="expMeterFrame">
+        <div class="exp-meter-liquid" id="expMeterLiquid">
+          <div class="exp-meter-meniscus"></div>
+        </div>
+        <div class="exp-meter-ticks" id="expMeterTicks"></div>
+      </div>
+      <div class="exp-meter-radius" id="expMeterRadius">0.0m</div>
     </div>
     
     <div id="controls">
@@ -136,6 +148,31 @@
     <div class="setup-footer-btns">
       <button type="button" id="cancelSetupBtn" class="action-btn secondary" style="flex:0.7;">キャンセル</button>
       <button type="button" id="confirmStartBattleBtn" class="action-btn" disabled style="flex:1.3;">出撃スタート</button>
+    </div>
+  </div>
+</div>
+
+<!-- 共闘出撃待機モーダル（送信側） -->
+<div id="coopWaitModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;">
+    <div class="eyebrow">CO-OP STANDBY</div>
+    <h2>フレンドの応答を待機中…</h2>
+    <p id="coopWaitDesc" class="modal-sub">参加要請を送信しました。相手が「参加」すると共闘で出撃し、「拒否」するとソロモードで出撃します。</p>
+    <div class="wait-pulse-bar"><div class="wait-pulse-fill"></div></div>
+    <button type="button" id="cancelCoopWaitBtn" class="action-btn secondary" style="margin-top:14px;">出撃をキャンセル</button>
+  </div>
+</div>
+
+<!-- 共闘参加要請専用モーダル（受信側） -->
+<div id="coopInviteModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;border-color:#00f5d4;">
+    <div class="eyebrow">CO-OP DISPATCH REQUEST</div>
+    <h2>共闘出撃の参加要請</h2>
+    <p id="coopInviteDesc" class="modal-sub">フレンドが出撃準備を完了しました！</p>
+    <div id="coopInviteSummary" class="setup-preview-box" style="text-align:left;margin:12px 0;"></div>
+    <div class="setup-footer-btns">
+      <button type="button" id="declineCoopInviteBtn" class="action-btn secondary" style="flex:0.8;border-color:#ff4d6d;color:#ffb3c1;">拒否</button>
+      <button type="button" id="acceptCoopInviteBtn" class="action-btn" style="flex:1.2;">参加する</button>
     </div>
   </div>
 </div>

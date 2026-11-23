@@ -1,188 +1,192 @@
 import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
-import { state, getEquippedSkin, getEffectiveStats, saveGameData } from './state.js';
+import { state, getEquippedSkin, getEffectiveStats } from './state.js';
 import { hud, announce } from './ui.js';
 import { spawn } from './map-fall-missile.js';
 
-export function burst(p, colorHex = 0x78e7ff){
+export function getMaxWaves(){
+  return (state.activeDifficulty && state.activeDifficulty.waves) ? state.activeDifficulty.waves : 5;
+}
+
+export function getEnemyMult(){
+  return (state.activeDifficulty && state.activeDifficulty.enemyMult) ? state.activeDifficulty.enemyMult : 1.0;
+}
+
+export function getSpeedMult(){
+  return (state.activeDifficulty && state.activeDifficulty.speedMult) ? state.activeDifficulty.speedMult : 1.0;
+}
+
+export function getWaveEnemyCounts(waveNum){
+  const idx = Math.min(waveNum - 1, CONFIG.COUNTS.length - 1);
+  const mult = getEnemyMult();
+  const baseM = CONFIG.COUNTS[idx] || (8 + waveNum * 5);
+  const baseF = CONFIG.FIGHTER_COUNTS[idx] || Math.max(0, waveNum - 1);
+  return {
+    missiles: Math.max(1, Math.round(baseM * mult)),
+    fighters: Math.max(0, Math.round(baseF * mult))
+  };
+}
+
+export function waveTotal(w, isCoop = false){
+  const c = getWaveEnemyCounts(w);
+  const base = c.missiles + c.fighters;
+  return isCoop ? Math.ceil(base * 1.5) : base;
+}
+
+export function clearEnemiesAndFx(){
+  if(state.scene){
+    for(const e of state.enemies) state.scene.remove(e);
+    for(const f of state.fx) state.scene.remove(f.m);
+  }
+  state.enemies.length = 0;
+  state.fx.length = 0;
+}
+
+export function burst(p, col = 0xff9233){
   if(!state.scene) return;
-  for(let i = 0; i < 6; i++){
-    const m = new T.Mesh(
-      new T.SphereGeometry(0.12, 6, 5),
-      new T.MeshBasicMaterial({ color: i % 2 ? colorHex : 0xffffff })
-    );
+  for(let i = 0; i < 14; i++){
+    const m = new T.Mesh(new T.SphereGeometry(.17, 6, 5), new T.MeshBasicMaterial({ color: col }));
     m.position.copy(p);
     state.scene.add(m);
-    state.fx.push({
-      m,
-      life: 20,
-      v: new T.Vector3((Math.random() - 0.5) * 0.2, Math.random() * 0.15, (Math.random() - 0.5) * 0.2)
-    });
+    state.fx.push({ m, life: 24, v: new T.Vector3((Math.random() - .5) * .36, Math.random() * .34, (Math.random() - .5) * .36) });
   }
 }
 
 export function burstWhiteStrong(p){
   if(!state.scene) return;
-  for(let i = 0; i < 14; i++){
-    const radius = i % 3 === 0 ? 0.24 : 0.15;
-    const m = new T.Mesh(
-      new T.SphereGeometry(radius, 8, 6),
-      new T.MeshBasicMaterial({ color: 0xffffff })
-    );
+  for(let i = 0; i < 24; i++){
+    const size = i % 3 === 0 ? 0.28 : 0.19;
+    const m = new T.Mesh(new T.SphereGeometry(size, 7, 6), new T.MeshBasicMaterial({ color: 0xffffff }));
     m.position.copy(p);
     state.scene.add(m);
     state.fx.push({
       m,
       life: 28,
-      v: new T.Vector3((Math.random() - 0.5) * 0.36, (Math.random() - 0.2) * 0.32, (Math.random() - 0.5) * 0.36)
+      v: new T.Vector3((Math.random() - .5) * .48, (Math.random() - .2) * .46, (Math.random() - .5) * .48)
     });
   }
 }
 
-export function getMaxWaves(){
-  return state.activeDifficulty ? state.activeDifficulty.waves : 5;
+export function spawnEnemy(isCoop = false){
+  const c = getWaveEnemyCounts(state.wave);
+  const fMax = isCoop ? Math.ceil(c.fighters * 1.5) : c.fighters;
+  const fNow = state.enemies.filter(e => e.userData.kind === 'fighter').length;
+  const kind = (fNow < fMax && Math.random() < .35) ? 'fighter' : 'missile';
+  const e = spawn(T, state.scene, state.target, state.wave, {}, kind, state.modelTemplates, false, null, getSpeedMult());
+  state.enemies.push(e);
+  state.spawned++;
 }
 
-export function beginWave(isCoop = false){
-  const skin = getEquippedSkin();
-  state.spawned = 0;
-  state.tick = 0;
-  state.wait = 0;
-  const modeLabel = isCoop ? '【共闘】' : '';
-  announce(`${modeLabel}[${state.activeDifficulty.name}] WAVE ${state.wave} / ${getMaxWaves()} — [${skin.name}]`);
-}
+export function applyEnemyDamage(enemyObj, dmg, beamColor, scoreMult, coopCtx = {}, finishBattleCb = null){
+  const { isCoop = false, isHost = false, sendCoop = null, fromRemote = false, strongWhiteFx = false } = coopCtx;
+  if(!enemyObj || !state.enemies.includes(enemyObj)) return;
 
-export function waveTotal(isCoop = false){
-  const idx = Math.min(state.wave - 1, CONFIG.COUNTS.length - 1);
-  const diffMult = state.activeDifficulty ? state.activeDifficulty.enemyMult : 1.0;
-  const missileCount = Math.round(CONFIG.COUNTS[idx] * diffMult);
-  const baseFighter = CONFIG.FIGHTER_COUNTS[idx] || 0;
-  const fighterCount = isCoop ? baseFighter * 3 : baseFighter;
-  return missileCount + fighterCount;
-}
-
-export function waveMissileCount(){
-  const idx = Math.min(state.wave - 1, CONFIG.COUNTS.length - 1);
-  const diffMult = state.activeDifficulty ? state.activeDifficulty.enemyMult : 1.0;
-  return Math.round(CONFIG.COUNTS[idx] * diffMult);
-}
-
-export function updateBattleHud(isCoop = false){
-  hud(state.wave, Math.max(0, state.enemies.length + waveTotal(isCoop) - state.spawned), state.peace, getMaxWaves());
-}
-
-export function applyEnemyDamage(enemyObj, dmg, beamColor, skinScoreMult, { isCoop = false, isHost = false, sendCoop = null, fromRemote = false, strongWhiteFx = false } = {}){
-  if(!enemyObj) return;
   enemyObj.userData.hp -= dmg;
-  if(strongWhiteFx){
-    burstWhiteStrong(enemyObj.position);
-  } else {
-    burst(enemyObj.position, beamColor);
-  }
+  if(strongWhiteFx) burstWhiteStrong(enemyObj.position);
+  else burst(enemyObj.position, beamColor);
 
   if(enemyObj.userData.hp <= 0){
-    state.scene.remove(enemyObj);
     const idx = state.enemies.indexOf(enemyObj);
-    if(idx !== -1) state.enemies.splice(idx, 1);
+    if(idx >= 0){
+      if(strongWhiteFx) burstWhiteStrong(enemyObj.position);
+      else burst(enemyObj.position, 0xffd23f);
 
-    if(!fromRemote){
-      const basePts = (enemyObj.userData.kind === 'fighter') ? CONFIG.SCORE_FIGHTER : CONFIG.SCORE_MISSILE;
-      const gained = Math.round(basePts * skinScoreMult);
-      state.score += gained;
-      if(!isCoop){
-        state.earnedGoldInMatch += gained;
-        state.gold += gained;
-        saveGameData();
-      } else if(isHost && sendCoop){
-        sendCoop({ type: 'enemyDestroyed', enemyId: enemyObj.userData.id, score: state.score });
+      const basePts = enemyObj.userData.kind === 'fighter' ? CONFIG.SCORE_FIGHTER : CONFIG.SCORE_MISSILE;
+      const pts = Math.round(basePts * scoreMult);
+      state.score += pts;
+      state.earnedGoldInMatch += pts;
+
+      const eid = enemyObj.userData.id;
+      state.scene.remove(enemyObj);
+      state.enemies.splice(idx, 1);
+
+      const rem = waveTotal(state.wave, isCoop) - state.spawned + state.enemies.length;
+      hud(state.wave, rem, state.peace, getMaxWaves());
+
+      if(isCoop && isHost && !fromRemote && sendCoop){
+        sendCoop({ type: 'destroyEnemy', enemyId: eid, beamColor, remaining: rem });
       }
     }
   }
 }
 
-export function updateEnemiesFrame({ isCoop, isHost, sendCoop, onBattleFinish }){
-  const skin = getEquippedSkin();
-  const eff = getEffectiveStats(skin);
+export function updateEnemiesAndWave(dt, coopCtx = {}, finishBattleCb = null){
+  const { isCoop = false, isHost = false, sendCoop = null } = coopCtx;
   const maxWaves = getMaxWaves();
-  const diffSpeedMult = state.activeDifficulty ? state.activeDifficulty.speedMult : 1.0;
+  const totalInWave = waveTotal(state.wave, isCoop);
 
   if(!isCoop || isHost){
-    if(state.spawned < waveTotal(isCoop) && state.enemies.length < CONFIG.MAX_ENEMIES && ++state.tick > 34){
+    state.tick++;
+    const spawnInterval = Math.max(16, Math.round((56 - state.wave * 5) / getSpeedMult()));
+    if(state.spawned < totalInWave && state.enemies.length < CONFIG.MAX_ENEMIES && state.tick > spawnInterval){
+      spawnEnemy(isCoop);
+      if(isCoop && isHost && sendCoop){
+        const lastEn = state.enemies[state.enemies.length - 1];
+        sendCoop({ type: 'spawnEnemy', payload: lastEn.userData });
+      }
       state.tick = 0;
-      const mCount = waveMissileCount();
-      const type = (state.spawned < mCount) ? 'missile' : 'fighter';
-      const e = spawn(T, state.scene, state.target, state.wave, CONFIG, type, state.modelTemplates, isCoop, null, diffSpeedMult);
-      state.enemies.push(e);
-      state.spawned++;
+    }
+  }
 
-      if(isCoop && isHost && sendCoop && e.userData.syncPayload){
-        sendCoop({ type: 'spawnEnemy', payload: e.userData.syncPayload });
+  for(let i = state.enemies.length - 1; i >= 0; i--){
+    const e = state.enemies[i], u = e.userData;
+    e.position.add(u.v);
+    if(u.kind === 'fighter'){
+      u.a += .05;
+      e.position.x += Math.sin(u.a) * .06;
+      e.rotation.z = Math.sin(u.a) * .3;
+    }
+
+    if((!isCoop || isHost) && e.position.y <= 0){
+      const skin = getEquippedSkin();
+      const eff = getEffectiveStats(skin);
+      const rawDmg = u.kind === 'fighter' ? 14 : 9;
+      const reducedDmg = Math.max(1, rawDmg - eff.def);
+      state.peace = Math.max(0, state.peace - reducedDmg);
+      burst(e.position, 0xff4d6d);
+      const eid = u.id;
+      state.scene.remove(e);
+      state.enemies.splice(i, 1);
+
+      const remNow = totalInWave - state.spawned + state.enemies.length;
+      if(isCoop && isHost && sendCoop){
+        sendCoop({ type: 'destroyEnemy', enemyId: eid, beamColor: 0xff4d6d, remaining: remNow });
+      }
+      if(state.peace <= 0){
+        if(isCoop && isHost && sendCoop) sendCoop({ type: 'battleEnd', win: false });
+        if(finishBattleCb) finishBattleCb(false);
+        return;
       }
     }
+  }
 
-    const enemySyncData = [];
-    for(let i = state.enemies.length - 1; i >= 0; i--){
-      const e = state.enemies[i];
-      e.userData.phase += 0.04;
-      if(e.userData.kind === 'fighter'){
-        e.position.add(e.userData.velocity);
-        e.position.y += Math.sin(e.userData.phase) * 0.015;
-        if(Math.hypot(e.position.x, e.position.z) < 2.2){
-          state.scene.remove(e);
-          state.enemies.splice(i, 1);
-          const dmgToPeace = Math.max(1, 20 - Math.floor(eff.def * 0.5));
-          state.peace = Math.max(0, state.peace - dmgToPeace);
-          if(state.peace <= 0){
-            if(isCoop && isHost && sendCoop) sendCoop({ type: 'battleEnd', win: false, score: state.score });
-            onBattleFinish(false);
-            return;
-          }
-          continue;
-        }
-      } else {
-        e.position.add(e.userData.velocity);
-        e.rotation.z += 0.02;
-        if(e.position.y <= -1.5){
-          state.scene.remove(e);
-          state.enemies.splice(i, 1);
-          const dmgToPeace = Math.max(1, 14 - Math.floor(eff.def * 0.5));
-          state.peace = Math.max(0, state.peace - dmgToPeace);
-          if(state.peace <= 0){
-            if(isCoop && isHost && sendCoop) sendCoop({ type: 'battleEnd', win: false, score: state.score });
-            onBattleFinish(false);
-            return;
-          }
-          continue;
-        }
-      }
-      enemySyncData.push({ id: e.userData.id, px: e.position.x, py: e.position.y, pz: e.position.z, hp: e.userData.hp });
-    }
+  const rem = totalInWave - state.spawned + state.enemies.length;
+  hud(state.wave, rem, state.peace, maxWaves);
 
-    if(isCoop && isHost && sendCoop && state.syncTick % 3 === 0){
-      sendCoop({
-        type: 'syncBattleState',
-        wave: state.wave,
-        peace: state.peace,
-        score: state.score,
-        remaining: Math.max(0, state.enemies.length + waveTotal(isCoop) - state.spawned),
-        enemies: enemySyncData
-      });
-    }
+  if(isCoop && isHost && sendCoop && state.syncTick % 5 === 0){
+    sendCoop({
+      type: 'syncBattleState',
+      wave: state.wave,
+      peace: state.peace,
+      score: state.score,
+      remaining: rem,
+      enemies: state.enemies.map(e => ({ id: e.userData.id, px: e.position.x, py: e.position.y, pz: e.position.z, hp: e.userData.hp }))
+    });
+  }
 
-    updateBattleHud(isCoop);
-    if(state.spawned >= waveTotal(isCoop) && !state.enemies.length && ++state.wait > 50){
+  if((!isCoop || isHost) && rem <= 0 && state.enemies.length === 0){
+    state.wait++;
+    if(state.wait === 1) announce(state.wave < maxWaves ? `WAVE ${state.wave} CLEAR` : 'ALL WAVES CLEAR');
+    if(state.wait > 85){
       if(state.wave < maxWaves){
         state.wave++;
-        beginWave(isCoop);
+        state.spawned = 0;
+        state.wait = 0;
+        announce(`WAVE ${state.wave} / ${maxWaves} — INCOMING`);
       } else {
-        if(isCoop && isHost && sendCoop) sendCoop({ type: 'battleEnd', win: true, score: state.score });
-        onBattleFinish(true);
+        if(isCoop && isHost && sendCoop) sendCoop({ type: 'battleEnd', win: true });
+        if(finishBattleCb) finishBattleCb(true);
       }
-    }
-  } else {
-    for(let i = state.enemies.length - 1; i >= 0; i--){
-      const e = state.enemies[i];
-      e.position.add(e.userData.velocity);
     }
   }
 }

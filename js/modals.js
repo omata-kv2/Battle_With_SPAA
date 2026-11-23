@@ -8,11 +8,65 @@ export function closeAllModals(){
   state.modalOpen = false;
   state.panelHoldTime = 0;
   updateHoldGauge(0);
-  const modals = ['#skinSelectModal', '#skinStoreModal', '#skinUpgradeModal', '#coopModal', '#usernameModal', '#battleSetupModal'];
+  const modals = [
+    '#skinSelectModal',
+    '#skinStoreModal',
+    '#skinUpgradeModal',
+    '#coopModal',
+    '#usernameModal',
+    '#battleSetupModal',
+    '#coopWaitModal',
+    '#coopInviteModal'
+  ];
   modals.forEach(id => {
     const el = $(id);
     if(el) el.classList.remove('visible');
   });
+}
+
+export function openCoopWaitModal(mode, diffId){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  const diffObj = getDifficultyById(diffId);
+  const modeLabel = mode === 'AIR_STRIKE' ? 'AIR STRIKE' : 'FALL MISSILE';
+  const descEl = $('#coopWaitDesc');
+  if(descEl){
+    descEl.textContent = `【${modeLabel} / ${diffObj.name}】の参加要請を送信しました。相手が「参加」すると共闘で出撃し、「拒否」するとソロモードで出撃します。`;
+  }
+  const el = $('#coopWaitModal');
+  if(el) el.classList.add('visible');
+}
+
+export function closeCoopWaitModal(){
+  const el = $('#coopWaitModal');
+  if(el) el.classList.remove('visible');
+  state.modalOpen = false;
+}
+
+export function openCoopInviteModal(inviteData){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  const diffObj = getDifficultyById(inviteData.diffId);
+  const modeLabel = inviteData.mode === 'AIR_STRIKE' ? 'AIR STRIKE（空挺ミサイル降下）' : 'FALL MISSILE（地上防衛迎撃）';
+  const sender = inviteData.senderName || 'フレンド';
+  const descEl = $('#coopInviteDesc');
+  const sumEl = $('#coopInviteSummary');
+  if(descEl){
+    descEl.textContent = `${sender} が出撃準備を完了しました！参加しますか？`;
+  }
+  if(sumEl){
+    sumEl.innerHTML = `モード: <b>${modeLabel}</b><br>難易度: <b>${diffObj.name}（${diffObj.jpName}）</b><br>※「拒否」を選ぶと相手のみソロモードで出撃します。`;
+  }
+  const el = $('#coopInviteModal');
+  if(el) el.classList.add('visible');
+}
+
+export function closeCoopInviteModal(){
+  const el = $('#coopInviteModal');
+  if(el) el.classList.remove('visible');
+  state.modalOpen = false;
 }
 
 export function openCoopModal(){
@@ -131,7 +185,7 @@ export function renderSkinSelectList(){
 
     let statSummary = '';
     if(skin.attackType === 'explosion'){
-      statSummary = `攻撃力:${eff.atk} / スコア倍率:${eff.scoreMult.toFixed(2)}x / 爆発範囲:${eff.blastRadiusM.toFixed(1)}m`;
+      statSummary = `攻撃力:${eff.atk} / スコア倍率:${eff.scoreMult.toFixed(2)}x / 追加爆発範囲:+${eff.bonusBlastRadiusM.toFixed(2)}m (最大${(15 + eff.bonusBlastRadiusM).toFixed(1)}m)`;
     } else if(skin.attackType === 'scatter'){
       statSummary = `攻撃力:${eff.atk}×7散弾 / 体力:${eff.hp} / スコア倍率:${eff.scoreMult.toFixed(2)}x`;
     } else if(skin.attackType === 'laser'){
@@ -194,7 +248,7 @@ function getUpgradeItemMeta(skin, upgKey){
     return { title: 'スコア獲得上昇', desc: `現在の獲得スコア倍率: ${eff.scoreMult.toFixed(2)}倍（+5% / Lv）`, swatch: 'SCORE', color: '#ffd23f' };
   }
   if(upgKey === 'blast'){
-    return { title: '爆発範囲上昇', desc: `現在の爆発半径: ${eff.blastRadiusM.toFixed(1)}m（初期1.0m / +0.2m / Lv）`, swatch: 'BLAST', color: '#ff9233' };
+    return { title: '爆発範囲増加', desc: `現在の追加爆発半径: +${eff.bonusBlastRadiusM.toFixed(2)}m（Lv.1: 0m / 最大Lv.10: +5.0m・計算後に加算）`, swatch: 'BLAST', color: '#ff9233' };
   }
   if(upgKey === 'duration'){
     return { title: '光線持続時間', desc: `現在の光線持続時間: ${eff.laserDurationSec.toFixed(1)}秒（初期3.0秒 / +0.2秒 / Lv）`, swatch: 'TIME', color: '#ff8fa3' };
@@ -287,7 +341,7 @@ export function renderUpgradeList(){
   } else if(skill.id === 'AdditionalTurre'){
     skillEffectDetail = `現在効果: ${eff.additionalTurreDuration}秒間 タレット${eff.rapidTurretCount}基を均等配置（攻撃力${eff.atk} / 連射速度${eff.rawRate.toFixed(1)}・本体同値）`;
   } else if(skill.id === 'FewCharger'){
-    skillEffectDetail = `現在効果: 10秒間溜め時間 -${eff.fewChargerReduction}秒（CD ${skill.cooldown}秒）`;
+    skillEffectDetail = `現在効果: 10秒間 最大チャージ必要時間 -${eff.fewChargerReduction}秒（CD ${skill.cooldown}秒）`;
   } else if(skill.id === 'InfinityBarrel'){
     skillEffectDetail = `現在効果: 10秒間CD0秒＆拡散範囲 ${eff.infinitySpreadMult}倍（CD ${skill.cooldown}秒）`;
   } else if(skill.id === 'NeverStopper'){

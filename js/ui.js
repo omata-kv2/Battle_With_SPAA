@@ -1,5 +1,69 @@
 export const $ = (sel) => document.querySelector(sel);
 
+let explosionTicksBuilt = false;
+
+export function ensureExplosionMeterTicks(){
+  if(explosionTicksBuilt) return;
+  const ticksWrap = $('#expMeterTicks');
+  if(!ticksWrap) return;
+  ticksWrap.innerHTML = '';
+  for(let i = 0; i <= 30; i++){
+    const pct = (i / 30) * 100;
+    const isMajor = (i % 10 === 0);
+    const tick = document.createElement('div');
+    tick.className = 'exp-tick ' + (isMajor ? 'major' : 'minor');
+    tick.style.bottom = `${pct}%`;
+    ticksWrap.appendChild(tick);
+
+    if(isMajor){
+      const lbl = document.createElement('span');
+      lbl.className = 'exp-tick-label';
+      lbl.style.bottom = `${pct}%`;
+      lbl.textContent = `${(i / 10).toFixed(1)}`;
+      ticksWrap.appendChild(lbl);
+    }
+  }
+  explosionTicksBuilt = true;
+}
+
+export function showExplosionChargeMeter(visible){
+  const el = $('#explosionChargeMeter');
+  if(!el) return;
+  if(visible){
+    ensureExplosionMeterTicks();
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+export function updateExplosionChargeMeter(chargedSec, isCharging, isMaxCharged, bonusRadiusM = 0){
+  const liquid = $('#expMeterLiquid');
+  const frame = $('#expMeterFrame');
+  const readout = $('#expMeterReadout');
+  const radiusEl = $('#expMeterRadius');
+  if(!liquid || !frame) return;
+
+  const clamped = Math.max(0, Math.min(3.0, chargedSec));
+  const pct = isCharging ? (clamped / 3.0) * 100 : 0;
+  liquid.style.height = `${pct}%`;
+
+  if(isCharging && isMaxCharged){
+    frame.classList.add('max-charged');
+  } else {
+    frame.classList.remove('max-charged');
+  }
+
+  if(readout){
+    readout.textContent = isCharging ? `${clamped.toFixed(1)}s` : '0.0s';
+  }
+  if(radiusEl){
+    const baseR = isCharging ? (clamped * 5) : 0;
+    const totalR = baseR + (isCharging ? bonusRadiusM : 0);
+    radiusEl.textContent = `${totalR.toFixed(1)}m`;
+  }
+}
+
 export function progress(pct, text){
   const area = $('#loadArea');
   const fill = $('#loadFill');
@@ -33,6 +97,7 @@ export function showEndScreen(win, score, earnedGold, isCoop, detailText = ''){
   const endEl = $('#endOverlay');
   if(!endEl) return;
   resetWhiteFade();
+  showExplosionChargeMeter(false);
   $('#endEyebrow').textContent = win ? 'WORLD PEACE RESTORED' : 'DEFENSE LINE BREACHED';
   $('#endTitle').innerHTML = win ? 'MISSION<br>COMPLETE' : 'MISSION<br>FAILED';
   const coopBonusStr = isCoop ? '（共闘ボーナス込）' : '';
@@ -74,6 +139,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
 
   if(mode === 'home'){
     clearLaserAttackButtons();
+    showExplosionChargeMeter(false);
     if(banner){
       banner.classList.remove('hidden-mode');
       const coopTag = isCoop ? (isHost ? ' [共闘ホスト]' : ' [共闘ゲスト]') : '';
@@ -82,6 +148,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'skin'){
     clearLaserAttackButtons();
+    showExplosionChargeMeter(false);
     if(banner){
       banner.classList.remove('hidden-mode');
       banner.textContent = `UNIT HANGAR — 装備中: ${skin ? skin.name : 'Origin'}`;
@@ -91,6 +158,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     if(banner) banner.classList.add('hidden-mode');
     battleEls.forEach(el => el.classList.remove('hidden-mode'));
     if(battleMode === 'AIR_STRIKE'){
+      showExplosionChargeMeter(false);
       if(fireWrap) fireWrap.classList.add('hidden-mode');
       const ret = $('#reticle');
       if(ret) ret.classList.add('hidden-mode');
@@ -98,6 +166,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
       $('#stat2Label').textContent = 'SURVIVED';
       $('#stat3Label').textContent = 'SCORE';
     } else {
+      showExplosionChargeMeter(skin && skin.attackType === 'explosion');
       $('#stat1Label').textContent = 'WAVE';
       $('#stat2Label').textContent = 'TARGETS';
       $('#stat3Label').textContent = 'PEACE';
