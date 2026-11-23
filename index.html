@@ -7,6 +7,24 @@
 <title>Cooking With SPAA v5.1</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+window.__spaaShowBootError = function(msg){
+  var box = document.getElementById("bootErrorBanner");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "bootErrorBanner";
+    box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:rgba(140,12,24,0.95);color:#fff;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-all;border:1px solid #ff8899;pointer-events:auto;";
+    document.body ? document.body.appendChild(box) : document.addEventListener("DOMContentLoaded", function(){ document.body.appendChild(box); });
+  }
+  box.textContent = "起動エラー: " + msg;
+};
+window.addEventListener("error", function(e){
+  if(e && e.message) window.__spaaShowBootError(e.message + (e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : ""));
+});
+window.addEventListener("unhandledrejection", function(e){
+  if(e && e.reason) window.__spaaShowBootError(e.reason.message || String(e.reason));
+});
+</script>
 <script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
 </head>
 <body>
@@ -407,6 +425,27 @@
 <audio id="se-restart" src="./assets/sounds/restart.mp3"></audio>
 <audio id="se-clear" src="./assets/sounds/clear.mp3"></audio>
 
-<script type="module" src="js/app.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  var btn = document.getElementById("tapStartBtn");
+  if(btn){
+    btn.addEventListener("click", function(){
+      if(!window.__spaaAppLoaded){
+        window.__spaaShowBootError("ゲームスクリプト(js/app.js)の読み込みが完了していません。ブラウザのコンソールやキャッシュ、js/libs/ 内のファイルを確認してください。");
+      }
+    });
+  }
+});
+</script>
+<script type="module">
+  import("./js/app.js?v=51").then(function(){
+    window.__spaaAppLoaded = true;
+  }).catch(function(err){
+    var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);
+    if(window.__spaaShowBootError){
+      window.__spaaShowBootError("モジュール読み込み失敗:\n" + msg);
+    }
+  });
+</script>
 </body>
 </html>

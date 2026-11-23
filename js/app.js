@@ -1,5 +1,5 @@
 import * as T from './libs/three.module.js';
-import { GLTFLoader } from './libs/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from './libs/GLTFLoader.js';
 import { CONFIG } from './config.js';
 import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData } from './state.js';
 import {
@@ -392,11 +392,18 @@ function loop(now){
 // ==========================================
 // UIボタンイベントバインド
 // ==========================================
-$('#tapStartBtn')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  $('#tapStartBtn').style.display = 'none';
+let startTriggered = false;
+const handleTapStart = (e) => {
+  if(e) e.preventDefault();
+  if(startTriggered) return;
+  startTriggered = true;
+  const btn = $('#tapStartBtn');
+  if(btn) btn.style.display = 'none';
   init();
-});
+};
+$('#tapStartBtn')?.addEventListener('pointerdown', handleTapStart);
+$('#tapStartBtn')?.addEventListener('touchend', handleTapStart);
+$('#tapStartBtn')?.addEventListener('click', handleTapStart);
 
 $('#saveUsernameBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();

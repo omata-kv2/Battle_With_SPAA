@@ -14,7 +14,8 @@ import {
 import { $, showToast, setModeUI, showExplosionChargeMeter } from './ui.js';
 import { resetCombatState, initLaserTurretDeployState } from './player.js';
 
-const texLoader = new T.TextureLoader();
+let texLoader = null;
+function getTexLoader(){ if(!texLoader) texLoader = new T.TextureLoader(); return texLoader; }
 
 let enemyTextureNormal = null;
 let enemyTextureBoom = null;
@@ -48,7 +49,7 @@ export const yajuState = {
   invulnerableTimer: 0,
   maze: null,
   goalMesh: null,
-  playerPos: new T.Vector3(0, 1.4, 0),
+  playerPos: null,
   enemies: [],
   projectiles: [],
   mapRocketItems: [],
@@ -189,7 +190,7 @@ function createEnemyMaterial(mapTex){
 
 function ensureYajuTextures(){
   if(!enemyTextureNormal){
-    texLoader.load(YAJU_CHASER_IMAGES[0], tex => {
+    getTexLoader().load(YAJU_CHASER_IMAGES[0], tex => {
       tex.colorSpace = T.SRGBColorSpace;
       enemyTextureNormal = tex;
       for(const e of yajuState.enemies){
@@ -200,7 +201,7 @@ function ensureYajuTextures(){
     }, undefined, () => {});
   }
   if(!enemyTextureBoom){
-    texLoader.load(YAJU_BOOM_IMAGE, tex => {
+    getTexLoader().load(YAJU_BOOM_IMAGE, tex => {
       tex.colorSpace = T.SRGBColorSpace;
       enemyTextureBoom = tex;
     }, undefined, () => {});
@@ -328,6 +329,7 @@ function spawnNormalChaserAt(x, z, id, isBossMinion = false){
     repathTimer: 0,
     color: YAJU_NEEDLE_COLORS[id % YAJU_NEEDLE_COLORS.length]
   };
+  planeMesh.userData.id = `yaju_${id}`;
   planeMesh.userData.yajuEnemy = enemyObj;
   yajuState.enemies.push(enemyObj);
   return enemyObj;
@@ -381,6 +383,7 @@ function setupEnemies(openCells, spawnPos){
       hasDamagedThisDash: false,
       color: '#ff0000'
     };
+    planeMesh.userData.id = 'yaju_boss_beast_king';
     planeMesh.userData.yajuEnemy = beastKing;
     yajuState.enemies.push(beastKing);
     updateBossHpUI(beastKing);
@@ -403,7 +406,7 @@ function setupEnemies(openCells, spawnPos){
     group.add(cubeMesh);
 
     if(!izanTexture){
-      texLoader.load(YAJU_IZAN_IMAGE, tex => {
+      getTexLoader().load(YAJU_IZAN_IMAGE, tex => {
         tex.colorSpace = T.SRGBColorSpace;
         izanTexture = tex;
         cubeMat.map = tex;
@@ -430,6 +433,7 @@ function setupEnemies(openCells, spawnPos){
       dashHitCooldown: false,
       color: '#00aaff'
     };
+    cubeMesh.userData.id = 'yaju_boss_world_enemy';
     cubeMesh.userData.yajuEnemy = worldEnemy;
     yajuState.enemies.push(worldEnemy);
     updateBossHpUI(worldEnemy);
@@ -496,6 +500,7 @@ function initYajuStage(subMode){
   stopYajuMedia();
   resetCombatState();
 
+  if(!yajuState.playerPos) yajuState.playerPos = new T.Vector3(0, 1.4, 0);
   yajuState.active = true;
   yajuState.subMode = subMode;
   yajuState.running = false;
@@ -1391,11 +1396,12 @@ function updateYajuProjectiles(dt){
   }
 }
 
-const camWorldPos = new T.Vector3();
-const camWorldDir = new T.Vector3();
-const tmpVec3 = new T.Vector3();
+let camWorldPos = null;
+let camWorldDir = null;
+let tmpVec3 = null;
 
 function updateOcclusionAndRockets(){
+  if(!camWorldPos){ camWorldPos = new T.Vector3(); camWorldDir = new T.Vector3(); tmpVec3 = new T.Vector3(); }
   if(yajuState.subMode === 'deadstage' || yajuState.clearStageActive || yajuState.isTransitioningToDeadStage) return;
   state.camera.getWorldPosition(camWorldPos);
   state.camera.getWorldDirection(camWorldDir);

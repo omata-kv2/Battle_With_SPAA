@@ -164,7 +164,7 @@ function makeMkLabelSprite(text, strokeCol = '#ff4d6d'){
 }
 
 function createLaserPyramidTurretMesh(tx, tz, mkNumber, labelPrefix = ''){
-  const groundY = -2.0;
+  const groundY = state.activeBattleMode === 'YAJU_BOSS' ? 0.0 : -2.0;
   const pyramidH = 1.35;
 
   const group = new T.Group();
@@ -361,11 +361,12 @@ function getCrosshairAimPoint(){
 
   const _enemies = getCombatEnemies();
   for(const e of _enemies){
+    const box = new T.Box3().setFromObject(e);
     const c = new T.Vector3();
-    new T.Box3().setFromObject(e).getCenter(c);
+    box.getCenter(c);
     const perpDist = ray.ray.distanceToPoint(c);
     const along = camOrigin.distanceTo(c);
-    if(perpDist < 2.2 && along < bestDistAlong){
+    if((perpDist < 2.2 || ray.ray.intersectsBox(box)) && along < bestDistAlong){
       bestDistAlong = along;
       bestEnemyPos = c;
     }
@@ -792,10 +793,11 @@ export function fireSingleBeam(skin, effectiveStats, spreadYaw = 0, spreadPitch 
   let hit = null, best = Infinity;
   const _enemies = getCombatEnemies();
   for(const e of _enemies){
+    const box = new T.Box3().setFromObject(e);
     const c = new T.Vector3();
-    new T.Box3().setFromObject(e).getCenter(c);
+    box.getCenter(c);
     const dist = ray.ray.distanceToPoint(c), along = rayOrigin.distanceTo(c);
-    if(dist < hitRadius && along < best){ hit = e; best = along; }
+    if((dist < hitRadius || ray.ray.intersectsBox(box)) && along < best){ hit = e; best = along; }
   }
 
   const endPt = hit ? getTargetWorldPos(hit) : rayOrigin.clone().add(d.clone().multiplyScalar(55));
@@ -862,10 +864,11 @@ function executeExplosionAttack(skin, eff, totalRadiusM, coopCtx){
   let hit = null, best = Infinity;
   const _enemies = getCombatEnemies();
   for(const e of _enemies){
+    const box = new T.Box3().setFromObject(e);
     const c = new T.Vector3();
-    new T.Box3().setFromObject(e).getCenter(c);
+    box.getCenter(c);
     const dist = ray.ray.distanceToPoint(c), along = rayOrigin.distanceTo(c);
-    if(dist < skin.stats.beamRadius && along < best){ hit = e; best = along; }
+    if((dist < skin.stats.beamRadius || ray.ray.intersectsBox(box)) && along < best){ hit = e; best = along; }
   }
 
   const impactPt = hit ? getTargetWorldPos(hit) : rayOrigin.clone().add(d.clone().multiplyScalar(52));
@@ -957,7 +960,7 @@ function executeAutomaticVolley(skin, eff, coopCtx = {}){
       const bF = b.userData.kind === 'fighter' ? 0 : 1;
       if(aF !== bF) return aF - bF;
     }
-    return origin.distanceTo(a.position) - origin.distanceTo(b.position);
+    return origin.distanceTo(getTargetWorldPos(a)) - origin.distanceTo(getTargetWorldPos(b));
   });
 
   const assignedSet = new Set();
@@ -1033,7 +1036,7 @@ function updateHomingProjectiles(dt, eff, coopCtx){
           const bF = b.userData.kind === 'fighter' ? 0 : 1;
           if(aF !== bF) return aF - bF;
         }
-        return p.pos.distanceTo(a.position) - p.pos.distanceTo(b.position);
+        return p.pos.distanceTo(getTargetWorldPos(a)) - p.pos.distanceTo(getTargetWorldPos(b));
       });
       p.targetEnemy = candidates.find(c => !otherTargeted.has(c.userData.id)) || candidates[0] || null;
     }
@@ -1077,11 +1080,11 @@ function updateHomingProjectiles(dt, eff, coopCtx){
 }
 
 function fireTurretHomingPulse(apexOrigin, turretAtk, eff, coopCtx){
-  if(state.enemies.length === 0) return;
+  const _enemies = getCombatEnemies();
+  if(_enemies.length === 0) return;
 
   let bestEnemy = null;
   let bestScore = Infinity;
-  const _enemies = getCombatEnemies();
   for(const e of _enemies){
     const c = new T.Vector3();
     new T.Box3().setFromObject(e).getCenter(c);
