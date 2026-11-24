@@ -668,11 +668,8 @@ $('#yajuStartNormalBtn')?.addEventListener('pointerdown', (e) => {
 $('#yajuIpadConfirmBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   closeAllModals();
-<<<<<<< HEAD
   resetMatchInventoryUsage();
   updateInventoryBar();
-=======
->>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
   startYajuNormalMode(pendingYajuNormalSettings);
 });
 
