@@ -142,10 +142,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
   if(mode === 'home'){
     const stickEl = $('#stick');
     if(stickEl) stickEl.classList.remove('hidden-mode');
-<<<<<<< HEAD
     showInventoryBar(false);
-=======
->>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
     if(banner){
@@ -157,10 +154,7 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
   } else if(mode === 'skin'){
     const stickEl = $('#stick');
     if(stickEl) stickEl.classList.remove('hidden-mode');
-<<<<<<< HEAD
     showInventoryBar(false);
-=======
->>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
     if(banner){
