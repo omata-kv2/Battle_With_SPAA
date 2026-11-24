@@ -1,18 +1,18 @@
 import * as T from './libs/three.module.js';
-import { GLTFLoader } from './libs/GLTFLoader.js';
 import { CONFIG } from './config.js';
-import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData } from './state.js';
+import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData, resetMatchInventoryUsage } from './state.js';
 import {
   $, progress, loading, loadError, hideStartScreen, showEndScreen, hideEndScreen,
-  setModeUI, showToast, updateHoldGauge, resetWhiteFade
+  setModeUI, showToast, updateHoldGauge, resetWhiteFade, initInventoryBar, updateInventoryBar
 } from './ui.js';
 import { initInputControls, resetMovementInputs } from './controls.js';
 import {
   closeAllModals, openCoopModal, openBattleSetupModal, renderBattleSetupModal,
   openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal,
-  openYajuSetupModal, openYajuBossSetupModal
+  openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal, switchStoreTab
 } from './modals.js';
 import { resetCombatState, updateCombatSystem } from './player.js';
+import { useInventoryItem } from './items.js';
 import { clearEnemiesAndFx, updateEnemiesAndWave } from './enemies.js';
 import { initFallMissileMode, updateFallMissileMode } from './mode-fall-missile.js';
 import { initAirStrikeMode, updateAirStrikeMode, generateAirStrikeMissionData } from './mode-air-strike.js';
@@ -58,6 +58,12 @@ export function enterHome(){
   closeAllModals();
 
   resetYajuState();
+  resetMatchInventoryUsage();
+  updateInventoryBar();
+  if(state.renderer){
+    state.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, CONFIG.MAX_PIXEL_RATIO));
+    resize();
+  }
   // バトル用のキャッシュ・状態・ソロ一時切替フラグを完全クリア
   coopState.battleSoloOverride = false;
   resetCoopMatchFlags();
@@ -70,6 +76,7 @@ export function enterHome(){
   state.wait = 0;
 
   state.gameMode = 'home';
+  state.activeBattleMode = 'FALL_MISSILE';
   state.x = 0;
   state.y = 0;
   state.z = 9;
@@ -129,6 +136,8 @@ export function startBattle(mode = 'FALL_MISSILE', diffId = 'easy', missionData 
   state.panelHoldTime = 0;
   state.triggerCooldown = 0;
   updateHoldGauge(0);
+  resetMatchInventoryUsage();
+  updateInventoryBar();
 
   state.gameMode = 'battle';
   state.activeBattleMode = mode;
@@ -192,9 +201,64 @@ bindYajuCallbacks({
   openBossSetup: openYajuBossSetupModal
 });
 
-async function load3DAssets(){
-  const loader = new GLTFLoader();
+async function resolveGLTFLoaderClass(){
   try{
+    const mod = await import('./libs/GLTFLoader.js');
+    if(mod && mod.GLTFLoader) return mod.GLTFLoader;
+  }catch(_e){}
+
+  try{
+    const threeAbs = new URL('./libs/three.module.js', import.meta.url).href;
+    let bufBlobUrl = null;
+    try{
+      const bufRes = await fetch('./js/libs/BufferGeometryUtils.js', { cache: 'no-store' });
+      if(bufRes.ok){
+        let bufCode = await bufRes.text();
+        bufCode = bufCode.replace(/from\s+['"][^'"]*three\.module\.js['"]/g, `from "${threeAbs}"`);
+        bufCode = bufCode.replace(/from\s+['"]three['"]/g, `from "${threeAbs}"`);
+        bufBlobUrl = URL.createObjectURL(new Blob([bufCode], { type: 'application/javascript' }));
+      }
+    }catch(_eb){}
+
+    const res = await fetch('./js/libs/GLTFLoader.js', { cache: 'no-store' });
+    if(res.ok){
+      let code = await res.text();
+      if(/export\s+(class|{|\*)/.test(code)){
+        code = code.replace(/from\s+['"][^'"]*three\.module\.js['"]/g, `from "${threeAbs}"`);
+        code = code.replace(/from\s+['"]three['"]/g, `from "${threeAbs}"`);
+        if(bufBlobUrl){
+          code = code.replace(/from\s+['"][^'"]*BufferGeometryUtils\.js['"]/g, `from "${bufBlobUrl}"`);
+        }
+        const blobUrl = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+        try{
+          const mod2 = await import(blobUrl);
+          if(mod2 && mod2.GLTFLoader) return mod2.GLTFLoader;
+        }finally{
+          URL.revokeObjectURL(blobUrl);
+          if(bufBlobUrl) URL.revokeObjectURL(bufBlobUrl);
+        }
+      } else {
+        if(bufBlobUrl) URL.revokeObjectURL(bufBlobUrl);
+        globalThis.THREE = globalThis.THREE || { ...T };
+        await new Promise((resolve, reject) => {
+          const sc = document.createElement('script');
+          sc.src = './js/libs/GLTFLoader.js';
+          sc.onload = resolve;
+          sc.onerror = reject;
+          document.head.appendChild(sc);
+        });
+        if(globalThis.THREE && globalThis.THREE.GLTFLoader) return globalThis.THREE.GLTFLoader;
+      }
+    }
+  }catch(_e2){}
+  return null;
+}
+
+async function load3DAssets(){
+  try{
+    const LoaderCls = await resolveGLTFLoaderClass();
+    if(!LoaderCls) throw new Error('GLTFLoaderを読み込めませんでした');
+    const loader = new LoaderCls();
     progress(32, 'Kh-35 ミサイルモデル読み込み中...');
     const mGltf = await loader.loadAsync('./assets/Kh-35.glb');
     state.modelTemplates.missile = normalizeModel(
@@ -216,6 +280,7 @@ async function load3DAssets(){
     );
   }catch(e){
     console.warn('3Dモデル読み込みフォールバック使用:', e);
+    showToast('3Dモデル読込失敗のため簡易表示を使用中', 3200);
   }
 }
 
@@ -224,6 +289,7 @@ async function init(){
     loading();
     loadGameData();
     initInputControls(getCoopContext);
+    initInventoryBar((itemId) => useInventoryItem(itemId, getCoopContext()));
 
     progress(15, '3Dレンダラー初期化中...');
     state.renderer = new T.WebGLRenderer({ canvas: $('#scene'), antialias: true, powerPreference: 'high-performance' });
@@ -330,6 +396,9 @@ function loop(now){
       } else if(hit === 'coop'){
         state.triggerCooldown = 45;
         openCoopModal();
+      } else if(hit === 'store'){
+        state.triggerCooldown = 45;
+        openSkinStoreModal('items');
       }
     }
   } else if(state.gameMode === 'skin' && state.skinController){
@@ -348,11 +417,6 @@ function loop(now){
           updateHoldGauge(0);
           openSkinSelectModal();
         }
-      } else if(zone === 'storePanel'){
-        state.panelHoldTime = 0;
-        updateHoldGauge(0);
-        state.triggerCooldown = 45;
-        openSkinStoreModal();
       } else {
         state.panelHoldTime = 0;
         updateHoldGauge(0);
@@ -591,12 +655,29 @@ $('#chatInput')?.addEventListener('keydown', (e) => {
 
 
 // YAJUMAZE 設定・ボス戦モーダル
+let pendingYajuNormalSettings = { compass: true, progressiveEnemies: true };
+
 $('#yajuStartNormalBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
-  const compass = !!$('#yajuSettingCompass')?.checked;
-  const progressiveEnemies = !!$('#yajuSettingProgressive')?.checked;
+  pendingYajuNormalSettings = {
+    compass: !!$('#yajuSettingCompass')?.checked,
+    progressiveEnemies: !!$('#yajuSettingProgressive')?.checked
+  };
+  openYajuIpadWarnModal();
+});
+
+$('#yajuIpadConfirmBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
   closeAllModals();
-  startYajuNormalMode({ compass, progressiveEnemies });
+  resetMatchInventoryUsage();
+  updateInventoryBar();
+  startYajuNormalMode(pendingYajuNormalSettings);
+});
+
+$('#yajuIpadCancelBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  closeAllModals();
+  enterHome();
 });
 
 $('#yajuOpenBossSetupBtn')?.addEventListener('pointerdown', (e) => {
@@ -621,5 +702,16 @@ $('#yajuBossStartBtn')?.addEventListener('pointerdown', (e) => {
   const bossId = state.selectedYajuBossId;
   const diffId = state.selectedYajuDiffId;
   closeAllModals();
+  resetMatchInventoryUsage();
+  updateInventoryBar();
   startYajuBossMode(bossId, diffId);
+});
+
+$('#tabItemShopBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  switchStoreTab('items');
+});
+$('#tabUnitShopBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  switchStoreTab('units');
 });

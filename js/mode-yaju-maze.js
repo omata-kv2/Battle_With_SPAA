@@ -47,6 +47,8 @@ export const yajuState = {
   isSlowed: false,
   slowTimer: 0,
   invulnerableTimer: 0,
+  empInvincibleTimer: 0,
+  enemyFreezeTimer: 0,
   maze: null,
   goalMesh: null,
   playerPos: null,
@@ -494,6 +496,10 @@ export function resetYajuState(){
   if(hudEl) hudEl.classList.add('hidden');
   if(endEl) endEl.classList.add('hidden');
   if(meter) meter.classList.remove('yaju-rocket-offset');
+  yajuState.empInvincibleTimer = 0;
+  yajuState.enemyFreezeTimer = 0;
+  const empOv = el('yajuEmpOverlay');
+  if(empOv) empOv.classList.add('hidden');
 }
 
 function initYajuStage(subMode){
@@ -648,10 +654,17 @@ function initYajuStage(subMode){
 
   ensureYajuTextures();
   yajuState.invulnerableTimer = YAJU_CONFIG.invulnerableDuration;
+  yajuState.empInvincibleTimer = 0;
+  yajuState.enemyFreezeTimer = 0;
+  el('yajuEmpOverlay')?.classList.add('hidden');
   yajuState.running = true;
 }
 
 export function startYajuNormalMode(settings){
+  if(state.renderer){
+    state.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
+    state.renderer.setSize(innerWidth, innerHeight, false);
+  }
   yajuState.settings = {
     compass: !!settings.compass,
     progressiveEnemies: !!settings.progressiveEnemies
@@ -764,7 +777,7 @@ function collidesWithWorldEnemy(x, z, radius){
 }
 
 function damagePlayer(amount, msg){
-  if(yajuState.ended || yajuState.clearStageActive || yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
+  if(yajuState.ended || yajuState.clearStageActive || yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage' || yajuState.empInvincibleTimer > 0) return;
   yajuState.playerHp = Math.max(0, yajuState.playerHp - amount);
 
   const hpFill = el('yajuHpFill');
@@ -1312,7 +1325,7 @@ function moveYajuEnemies(dt){
           damagePlayer(dmg, `追跡者にダメージを受けた！(-${dmg} HP)`);
           if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
         }
-      } else if(yajuState.invulnerableTimer <= 0){
+      } else if(yajuState.invulnerableTimer <= 0 && yajuState.empInvincibleTimer <= 0){
         finishYajuNormal(false);
         return;
       }
@@ -1504,8 +1517,32 @@ export function updateYajuMazeMode(dt){
     if(yajuState.invulnerableTimer <= 0) showYajuMessage('無敵時間が終了した');
   }
 
+  if(yajuState.empInvincibleTimer > 0){
+    yajuState.empInvincibleTimer = Math.max(0, yajuState.empInvincibleTimer - dt);
+    if(state.syncTick % 8 === 0 && state.scene && yajuState.playerPos){
+      const ring = new T.Mesh(
+        new T.TorusGeometry(0.85, 0.04, 5, 16),
+        new T.MeshBasicMaterial({ color: 0x38c8f0, transparent: true, opacity: 0.75 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(yajuState.playerPos.x, yajuState.playerPos.y - 1.1, yajuState.playerPos.z);
+      state.scene.add(ring);
+      state.fx.push({ m: ring, life: 10, v: new T.Vector3(0, 0.04, 0) });
+    }
+    if(yajuState.empInvincibleTimer <= 0){
+      el('yajuEmpOverlay')?.classList.add('hidden');
+      showYajuMessage('電磁防御システムの無敵時間が終了した');
+    }
+  }
+
+  if(yajuState.enemyFreezeTimer > 0){
+    yajuState.enemyFreezeTimer = Math.max(0, yajuState.enemyFreezeTimer - dt);
+  }
+
   moveYajuPlayer(dt);
-  moveYajuEnemies(dt);
+  if(yajuState.enemyFreezeTimer <= 0){
+    moveYajuEnemies(dt);
+  }
   updateYajuProjectiles(dt);
   updateOcclusionAndRockets();
 
@@ -1520,5 +1557,34 @@ export function updateYajuMazeMode(dt){
   if(yajuState.subMode === 'normal' && yajuState.goalMesh &&
      Math.hypot(yajuState.playerPos.x - yajuState.goalMesh.position.x, yajuState.playerPos.z - yajuState.goalMesh.position.z) < 1.35){
     finishYajuNormal(true);
+  }
+}
+
+export function activateYajuEmpShield(durationSec = 8.0){
+  yajuState.empInvincibleTimer = durationSec;
+  el('yajuEmpOverlay')?.classList.remove('hidden');
+  showYajuMessage(`電磁防御システム発動！(${durationSec}秒間無敵)`);
+}
+
+export function applyYajuGlobalNuke(dmg = 1000, freezeSec = 7.0){
+  yajuState.enemyFreezeTimer = freezeSec;
+  for(const eObj of [...yajuState.enemies]){
+    if(eObj.state === 'defeated' || eObj.state === 'booming') continue;
+    if(eObj.isWorldEnemy || eObj.isBeastKing){
+      eObj.hp = Math.max(0, eObj.hp - dmg);
+      updateBossHpUI(eObj);
+      if(eObj.hp <= 0){
+        const label = eObj.isWorldEnemy ? 'World Enemy' : '獣王';
+        triggerClearStage(label);
+        return;
+      }
+    } else {
+      eObj.state = 'booming';
+      eObj.repathTimer = 1.0;
+      if(enemyTextureBoom && eObj.planeMesh){
+        eObj.planeMesh.material = createEnemyMaterial(enemyTextureBoom);
+      }
+      playYajuAudio('se-boom', 1.0);
+    }
   }
 }

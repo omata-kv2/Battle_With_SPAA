@@ -115,7 +115,26 @@ export function updateEnemiesAndWave(dt, coopCtx = {}, finishBattleCb = null){
   const maxWaves = getMaxWaves();
   const totalInWave = waveTotal(state.wave, isCoop);
 
-  if(!isCoop || isHost){
+  const isFrozen = state.enemyFreezeTimer > 0;
+  if(isFrozen){
+    state.enemyFreezeTimer = Math.max(0, state.enemyFreezeTimer - dt);
+    if(state.enemyFreezeType === 'emp' && state.syncTick % 7 === 0 && state.scene){
+      for(const e of state.enemies){
+        const ring = new T.Mesh(
+          new T.TorusGeometry(0.95, 0.05, 5, 14),
+          new T.MeshBasicMaterial({ color: 0x38c8f0, transparent: true, opacity: 0.85 })
+        );
+        ring.position.copy(e.position);
+        ring.rotation.x = Math.random() * Math.PI;
+        ring.rotation.y = Math.random() * Math.PI;
+        state.scene.add(ring);
+        state.fx.push({ m: ring, life: 10 });
+      }
+    }
+    if(state.enemyFreezeTimer <= 0) state.enemyFreezeType = null;
+  }
+
+  if(!isFrozen && (!isCoop || isHost)){
     state.tick++;
     const spawnInterval = Math.max(16, Math.round((56 - state.wave * 5) / getSpeedMult()));
     if(state.spawned < totalInWave && state.enemies.length < CONFIG.MAX_ENEMIES && state.tick > spawnInterval){
@@ -128,6 +147,7 @@ export function updateEnemiesAndWave(dt, coopCtx = {}, finishBattleCb = null){
     }
   }
 
+  if(!isFrozen){
   for(let i = state.enemies.length - 1; i >= 0; i--){
     const e = state.enemies[i], u = e.userData;
     e.position.add(u.v);
@@ -160,6 +180,7 @@ export function updateEnemiesAndWave(dt, coopCtx = {}, finishBattleCb = null){
     }
   }
 
+  }
   const rem = totalInWave - state.spawned + state.enemies.length;
   hud(state.wave, rem, state.peace, maxWaves);
 

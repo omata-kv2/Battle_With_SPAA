@@ -1,3 +1,5 @@
+import { SHOP_ITEMS } from './config.js';
+import { state } from './state.js';
 export const $ = (sel) => document.querySelector(sel);
 
 let explosionTicksBuilt = false;
@@ -138,6 +140,9 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
   const fireWrap = $('#fireWrap');
 
   if(mode === 'home'){
+    const stickEl = $('#stick');
+    if(stickEl) stickEl.classList.remove('hidden-mode');
+    showInventoryBar(false);
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
     if(banner){
@@ -147,6 +152,9 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     }
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'skin'){
+    const stickEl = $('#stick');
+    if(stickEl) stickEl.classList.remove('hidden-mode');
+    showInventoryBar(false);
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
     if(banner){
@@ -155,6 +163,8 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     }
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'battle'){
+    showInventoryBar(battleMode !== 'YAJU_DEAD');
+    updateInventoryBar();
     if(banner) banner.classList.add('hidden-mode');
     const skillBtn = $('#skillBtn');
     if(skillBtn) skillBtn.classList.remove('hidden-mode');
@@ -328,4 +338,71 @@ export function airStrikeHud(altitudeM, survivedM, scoreVal){
 export function announce(msg){
   const el = $('#announce');
   if(el) el.textContent = msg;
+}
+
+let invBarInitialized = false;
+export function initInventoryBar(onUseItem){
+  if(invBarInitialized) return;
+  invBarInitialized = true;
+  SHOP_ITEMS.forEach((item, idx) => {
+    const slot = $(`#invSlot_${idx}`);
+    if(!slot) return;
+    slot.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if(onUseItem) onUseItem(item.id);
+    });
+  });
+  updateInventoryBar();
+}
+
+export function showInventoryBar(visible){
+  const bar = $('#itemInventoryBar');
+  if(bar) bar.classList.toggle('hidden', !visible);
+}
+
+export function updateInventoryBar(){
+  SHOP_ITEMS.forEach((item, idx) => {
+    const slot = $(`#invSlot_${idx}`);
+    if(!slot) return;
+    const nameEl = slot.querySelector('.inv-name');
+    const cntEl = slot.querySelector('.inv-count');
+    const count = (state.inventory && state.inventory[item.id]) || 0;
+    const used = !!(state.usedItemsInMatch && state.usedItemsInMatch[item.id]);
+
+    slot.classList.remove('inv-empty', 'inv-used');
+    if(count <= 0 && !used){
+      slot.classList.add('inv-empty');
+      if(nameEl) nameEl.textContent = item.shortName;
+      if(cntEl) cntEl.classList.add('hidden');
+    } else if(used){
+      slot.classList.add('inv-used');
+      if(nameEl) nameEl.textContent = '使用済';
+      if(cntEl){
+        if(count > 0){
+          cntEl.textContent = String(count);
+          cntEl.classList.remove('hidden');
+        } else {
+          cntEl.classList.add('hidden');
+        }
+      }
+    } else {
+      if(nameEl){
+        nameEl.textContent = item.shortName;
+        nameEl.style.color = item.color;
+      }
+      if(cntEl){
+        cntEl.textContent = String(count);
+        cntEl.classList.remove('hidden');
+      }
+    }
+  });
+}
+
+export function triggerBlueWhiteFadeOut(){
+  const ov = $('#blueWhiteFadeOverlay');
+  if(!ov) return;
+  ov.classList.remove('fading');
+  void ov.offsetWidth;
+  ov.classList.add('fading');
 }

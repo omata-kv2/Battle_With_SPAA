@@ -96,7 +96,7 @@ export function initInputControls(getCoopCtx){
   const stick = $('#stick');
   if(stick){
     stick.addEventListener('pointerdown', (e) => {
-      if(state.modalOpen) return;
+      if(state.modalOpen || state.activeBattleMode === 'YAJU_DEAD') return;
       e.preventDefault();
       stickId = e.pointerId;
       stick.setPointerCapture(e.pointerId);
@@ -203,7 +203,7 @@ export function initInputControls(getCoopCtx){
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')){
       return;
     }
-    if(!state.modalOpen){
+    if(!state.modalOpen && state.activeBattleMode !== 'YAJU_DEAD'){
       state.keys[e.code] = true;
       if(e.code === 'Space' && !e.repeat){
         if(state.activeBattleMode === 'YAJU_MAZE') shootYajuRocket();

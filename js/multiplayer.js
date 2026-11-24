@@ -661,8 +661,18 @@ function connectAsLobbyGuest(){
   guestPeer.on('open', () => {
     const c = guestPeer.connect(LOBBY_HUB_ID, { reliable: true });
     lobbyHubConn = c;
+    let opened = false;
+    const openTimeout = setTimeout(() => {
+      if(!opened){
+        try { c.close(); } catch(e){}
+        lobbyHubConn = null;
+        scheduleLobbyReconnect();
+      }
+    }, 4500);
 
     c.on('open', () => {
+      opened = true;
+      clearTimeout(openTimeout);
       updateLobbyOnlineCountUI(2);
       if(myActiveRecruitId && activeRecruits.has(myActiveRecruitId)){
         const myRec = activeRecruits.get(myActiveRecruitId);
@@ -727,10 +737,21 @@ export function sendGlobalChatMessage(){
   input.value = '';
   appendChatMessageToUI(payload);
 
+  let delivered = false;
   if(isLobbyHub){
     broadcastFromHub({ type: 'chatMsg', payload });
+    delivered = true;
   } else if(lobbyHubConn && lobbyHubConn.open){
     lobbyHubConn.send({ type: 'chatMsg', payload });
+    delivered = true;
+  }
+  if(coopState.isCoop && coopState.conn && coopState.conn.open){
+    coopState.conn.send({ type: 'chatMsg', payload });
+    delivered = true;
+  }
+  if(!delivered){
+    showToast('全体ロビーへ再接続中です…', 2200);
+    scheduleLobbyReconnect();
   }
 }
 
@@ -759,6 +780,9 @@ export function publishCoopRecruit(){
     broadcastFromHub({ type: 'recruitStart', payload: rec });
   } else if(lobbyHubConn && lobbyHubConn.open){
     lobbyHubConn.send({ type: 'recruitStart', payload: rec });
+  } else {
+    showToast('全体ロビー接続待ちのため自動再接続します…', 2400);
+    scheduleLobbyReconnect();
   }
 
   const recruitBtn = $('#recruitCoopBtn');
@@ -883,7 +907,9 @@ function setupCoopDataHandlers(connection){
   connection.on('data', (data) => {
     if(!data || !data.type) return;
 
-    if(data.type === 'hello'){
+    if(data.type === 'chatMsg' && data.payload){
+      appendChatMessageToUI(data.payload);
+    } else if(data.type === 'hello'){
       coopState.remotePos.username = data.username;
       updateRemoteNameLabel(data.username);
       if(coopState.remoteAirStrikeCraft && coopState.remoteAirStrikeCraft.nameSprite){

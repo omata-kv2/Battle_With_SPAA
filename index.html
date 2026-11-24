@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#071522">
-<title>Cooking With SPAA v5.1</title>
+<title>Cooking With SPAA v5.2</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
@@ -25,7 +25,7 @@ window.addEventListener("unhandledrejection", function(e){
   if(e && e.reason) window.__spaaShowBootError(e.reason.message || String(e.reason));
 });
 </script>
-<script type="importmap">{"imports":{"three":"./js/libs/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"./js/libs/three.module.js","./js/utils/BufferGeometryUtils.js":"./js/libs/BufferGeometryUtils.js"}}</script>
 </head>
 <body>
 <div id="game" class="not-loaded">
@@ -154,6 +154,24 @@ window.addEventListener("unhandledrejection", function(e){
       </div>
     </div>
 
+
+    <!-- 画面右端 3連結アイテムインベントリ（全ゲームモード共通） -->
+    <div id="itemInventoryBar" class="item-inv-bar hidden" aria-label="アイテムインベントリ">
+      <button type="button" class="inv-slot inv-empty" data-slot="0" id="invSlot_0">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+      <button type="button" class="inv-slot inv-empty" data-slot="1" id="invSlot_1">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+      <button type="button" class="inv-slot inv-empty" data-slot="2" id="invSlot_2">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+    </div>
+    <div id="yajuEmpOverlay" class="yaju-emp-overlay hidden"></div>
+
     <div id="controls">
       <div id="stick" aria-label="移動スティック"><div id="stickKnob"></div></div>
       <div class="right-controls battle-only hidden-mode" id="fireWrap">
@@ -170,6 +188,7 @@ window.addEventListener("unhandledrejection", function(e){
 
 <!-- クリア時2秒ホワイトアウト用オーバーレイ -->
 <div id="whiteFadeOverlay"></div>
+<div id="blueWhiteFadeOverlay"></div>
 
 <!-- スタート画面 -->
 <div id="startOverlay" class="visible">
@@ -319,17 +338,25 @@ window.addEventListener("unhandledrejection", function(e){
   </div>
 </div>
 
-<!-- 機体ショップモーダル -->
+<!-- ストアモーダル（アイテムショップ / 機体購入） -->
 <div id="skinStoreModal" class="modal-overlay">
   <div class="modal-panel">
     <div class="store-header">
-      <div class="eyebrow">UNIT SHOP</div>
-      <div class="store-gold">所持ゴールド: <b id="storeGoldVal">0</b> G</div>
+      <div class="eyebrow">SPAA STORE</div>
+      <div class="store-currencies">
+        <span class="store-gold">G: <b id="storeGoldVal">0</b></span>
+        <span class="store-yaju">Y: <b id="storeYajuCoinVal">0</b>枚</span>
+      </div>
     </div>
-    <h2>機体ショップ</h2>
-    <p class="modal-sub">ゴールドを消費して新しい機体のロックを解除できます</p>
-    <div id="storeSkinsList" class="skin-list"></div>
-    <button id="closeStoreBtn" class="action-btn secondary" type="button">閉じる</button>
+    <div class="store-tabs">
+      <button type="button" id="tabItemShopBtn" class="store-tab-btn active">アイテムショップ</button>
+      <button type="button" id="tabUnitShopBtn" class="store-tab-btn">機体購入</button>
+    </div>
+    <h2 id="storeModalTitle">アイテムショップ</h2>
+    <p id="storeModalSub" class="modal-sub">ゴールドやYAJUコインで戦闘用アイテムを購入できます（複数所持可）</p>
+    <div id="storeItemsList" class="skin-list"></div>
+    <div id="storeSkinsList" class="skin-list hidden"></div>
+    <button id="closeStoreBtn" class="action-btn secondary" type="button" style="margin-top:12px;">閉じる</button>
   </div>
 </div>
 
@@ -375,6 +402,19 @@ window.addEventListener("unhandledrejection", function(e){
       <button type="button" id="yajuStartNormalBtn" class="action-btn">この設定でスタート</button>
       <button type="button" id="yajuOpenBossSetupBtn" class="action-btn upgrade-open-btn">ボス戦</button>
       <button type="button" id="yajuCancelSetupBtn" class="action-btn secondary">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE iPad警告モーダル -->
+<div id="yajuIpadWarnModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;border-color:#ff4d6d;">
+    <div class="eyebrow" style="color:#ff4d6d;">PERFORMANCE WARNING</div>
+    <h2>動作環境のご注意</h2>
+    <p class="yaju-ipad-warn-text">iPadでは動作が保証されていません！！それでも始めますか？</p>
+    <div class="yaju-setup-btns" style="margin-top:14px;">
+      <button type="button" id="yajuIpadConfirmBtn" class="action-btn">了解した</button>
+      <button type="button" id="yajuIpadCancelBtn" class="action-btn secondary">iPadなので止めておきます</button>
     </div>
   </div>
 </div>
@@ -438,12 +478,67 @@ document.addEventListener("DOMContentLoaded", function(){
 });
 </script>
 <script type="module">
-  import("./js/app.js?v=51").then(function(){
+  async function diagnoseFailedModules() {
+    const files = [
+      "./js/libs/three.module.js",
+      "./js/libs/GLTFLoader.js",
+      "./js/config.js",
+      "./js/yaju-config.js",
+      "./js/state.js",
+      "./js/ui.js",
+      "./js/yaju-collision.js",
+      "./js/yaju-world.js",
+      "./js/map-home.js",
+      "./js/map-skin.js",
+      "./js/map-fall-missile.js",
+      "./js/map-air-strike.js",
+      "./js/enemies.js",
+      "./js/mode-fall-missile.js",
+      "./js/mode-air-strike.js",
+      "./js/mode-yaju-maze.js",
+      "./js/player.js",
+      "./js/controls.js",
+      "./js/modals.js",
+      "./js/multiplayer.js",
+      "./js/items.js",
+      "./js/app.js"
+    ];
+    const problems = [];
+    for (const f of files) {
+      try {
+        const res = await fetch(f, { cache: "no-store" });
+        if (!res.ok) {
+          problems.push(f + " -> HTTP " + res.status);
+        } else {
+          const txt = await res.text();
+          if (txt.trim().startsWith("// Failed to download")) {
+            problems.push(f + " -> 中身が空のダミーファイルです");
+          }
+        }
+      } catch (e) {
+        problems.push(f + " -> fetch失敗: " + (e.message || e));
+      }
+    }
+    if (problems.length > 0) {
+      return "問題が見つかったファイル:\n" + problems.join("\n");
+    }
+    for (const f of files) {
+      try {
+        await import(f + "?diag=" + Date.now());
+      } catch (e) {
+        return "import失敗: " + f + "\n" + (e && e.message ? e.message : String(e));
+      }
+    }
+    return "全ファイル200 OKですが、app.jsの読み込みに失敗しました。";
+  }
+
+  import("./js/app.js?v=52").then(function(){
     window.__spaaAppLoaded = true;
-  }).catch(function(err){
+  }).catch(async function(err){
     var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);
+    var detail = await diagnoseFailedModules();
     if(window.__spaaShowBootError){
-      window.__spaaShowBootError("モジュール読み込み失敗:\n" + msg);
+      window.__spaaShowBootError("モジュール読み込み失敗:\n" + msg + "\n\n" + detail);
     }
   });
 </script>

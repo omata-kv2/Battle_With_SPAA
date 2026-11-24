@@ -25,6 +25,10 @@ export const state = {
   earnedGoldInMatch: 0,
   gold: 0,
   yajuCoins: 0,
+  inventory: { emp_shield: 0, hydrogen_bomb: 0, yaju_nuke: 0 },
+  usedItemsInMatch: { emp_shield: false, hydrogen_bomb: false, yaju_nuke: false },
+  enemyFreezeTimer: 0,
+  enemyFreezeType: null,
 
   yaw: 0,
   pitch: -0.05,
@@ -170,6 +174,19 @@ export function loadGameData(){
     if(!Number.isNaN(parsedCoins)) state.yajuCoins = parsedCoins;
   }
 
+  const savedInv = localStorage.getItem('spaa_inventory');
+  if(savedInv){
+    try{
+      const invObj = JSON.parse(savedInv);
+      if(invObj && typeof invObj === 'object'){
+        for(const k of ['emp_shield', 'hydrogen_bomb', 'yaju_nuke']){
+          const v = parseInt(invObj[k], 10);
+          if(!Number.isNaN(v) && v >= 0) state.inventory[k] = v;
+        }
+      }
+    }catch(e){}
+  }
+
   const savedUnlocked = localStorage.getItem('spaa_unlocked_skins');
   if(savedUnlocked){
     try{
@@ -208,7 +225,14 @@ export function saveGameData(){
   localStorage.setItem('spaa_username', state.username);
   localStorage.setItem('spaa_gold', String(state.gold));
   localStorage.setItem('spaa_yaju_coins', String(state.yajuCoins || 0));
+  localStorage.setItem('spaa_inventory', JSON.stringify(state.inventory));
   localStorage.setItem('spaa_unlocked_skins', JSON.stringify(state.unlockedSkins));
   localStorage.setItem('spaa_selected_skin', state.selectedSkinId);
   localStorage.setItem('spaa_skin_upgrades', JSON.stringify(state.skinUpgrades));
+}
+
+export function resetMatchInventoryUsage(){
+  state.usedItemsInMatch = { emp_shield: false, hydrogen_bomb: false, yaju_nuke: false };
+  state.enemyFreezeTimer = 0;
+  state.enemyFreezeType = null;
 }

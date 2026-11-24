@@ -783,3 +783,82 @@ body.yaju-boss-active .yaju-controls,
   position:fixed;inset:0;z-index:75;display:flex;align-items:center;justify-content:center;
   background:rgba(3,10,18,.86);backdrop-filter:blur(6px);padding:20px;
 }
+
+.yaju-ipad-warn-text{color:#ff4d6d;font-size:15px;font-weight:900;line-height:1.6;margin:12px 0;padding:10px;border-radius:8px;background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.45);}
+
+
+/* ==========================================
+   v5.2 ストアタブ・3連結インベントリ・核/EMP演出
+   ========================================== */
+.store-currencies{display:flex;gap:10px;align-items:center;font-size:12px;font-weight:800}
+.store-yaju{color:#ff9ebb}
+.store-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 12px}
+.store-tab-btn{
+  padding:9px 10px;border-radius:10px;border:1px solid var(--border);
+  background:#0c253b;color:var(--muted);font-size:13px;font-weight:800;cursor:pointer;
+  touch-action:manipulation;
+}
+.store-tab-btn.active{
+  border:2px solid var(--gold);background:rgba(255,210,63,.16);color:var(--gold);
+}
+
+/* 画面右端 3つの四角形が繋がったインベントリ */
+.item-inv-bar{
+  position:fixed;
+  right:max(10px,env(safe-area-inset-right));
+  top:22%;
+  display:flex;
+  flex-direction:column;
+  z-index:20;
+  pointer-events:auto;
+  border:2px solid rgba(255,255,255,.38);
+  border-radius:8px;
+  overflow:hidden;
+  background:rgba(7,21,34,.82);
+  box-shadow:0 6px 18px rgba(0,0,0,.55);
+}
+.inv-slot{
+  position:relative;
+  width:52px;height:52px;
+  border:none;
+  border-bottom:1px solid rgba(255,255,255,.25);
+  background:rgba(14,38,60,.88);
+  color:#eaf8ff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:2px;cursor:pointer;touch-action:manipulation;
+}
+.inv-slot:last-child{border-bottom:none}
+.inv-slot.inv-empty{opacity:.42;cursor:default;background:rgba(8,20,32,.65)}
+.inv-slot.inv-used{opacity:.45;background:rgba(30,18,22,.85);cursor:not-allowed}
+.inv-name{font-size:10px;font-weight:900;line-height:1.15;text-align:center;word-break:keep-all}
+.inv-count{
+  position:absolute;right:3px;bottom:2px;
+  font-size:10px;font-weight:900;color:#ffd23f;
+  text-shadow:0 1px 3px #000;
+}
+
+/* 青白く3秒かけてフェードアウトする演出 */
+#blueWhiteFadeOverlay{
+  position:fixed;inset:0;
+  background:radial-gradient(circle at 50% 50%, #ffffff 0%, #c8f4ff 55%, #7ad7ff 100%);
+  opacity:0;pointer-events:none;z-index:92;
+}
+#blueWhiteFadeOverlay.fading{
+  animation:blueWhiteFade3s 3.0s ease-out forwards;
+}
+@keyframes blueWhiteFade3s{
+  0%{opacity:0.95}
+  100%{opacity:0}
+}
+
+/* YAJU系 電磁防御システム無敵オーラ */
+.yaju-emp-overlay{
+  position:fixed;inset:0;pointer-events:none;z-index:11;
+  box-shadow:inset 0 0 42px rgba(56,200,240,.85), inset 0 0 12px rgba(126,249,232,.95);
+  border:3px solid rgba(56,200,240,.7);
+  animation:empPulse .6s ease-in-out infinite alternate;
+}
+@keyframes empPulse{
+  from{opacity:.55}
+  to{opacity:1}
+}

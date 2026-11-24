@@ -89,8 +89,7 @@ export function buildSkinWorld(T, scene, unlockedSkins = ['Origin'], selectedSki
     return { group: g, holo, x, z, radius: 2.3 };
   }
 
-  const selectConsole = createConsole('機体選択・強化パネル', 0x00f5d4, -5.5, 4);
-  const storeConsole = createConsole('機体ショップパネル', 0xffd23f, 5.5, 4);
+  const selectConsole = createConsole('機体選択・強化パネル', 0x00f5d4, 0, 4);
 
   const pedestals = [];
   const totalSkins = CONFIG.SKINS.length;
@@ -178,7 +177,6 @@ export function buildSkinWorld(T, scene, unlockedSkins = ['Origin'], selectedSki
     refreshPedestals,
     update(tick){
       selectConsole.holo.rotation.y += 0.03;
-      storeConsole.holo.rotation.y -= 0.03;
       pedestals.forEach((p, idx) => {
         p.coreModel.rotation.y += 0.025;
         p.coreModel.position.y = 1.65 + Math.sin(tick * 0.05 + idx) * 0.12;
@@ -187,7 +185,6 @@ export function buildSkinWorld(T, scene, unlockedSkins = ['Origin'], selectedSki
     checkZone(px, pz){
       if(Math.hypot(px - 0, pz - 12) < 2.2) return 'backHome';
       if(Math.hypot(px - selectConsole.x, pz - selectConsole.z) < selectConsole.radius) return 'selectPanel';
-      if(Math.hypot(px - storeConsole.x, pz - storeConsole.z) < storeConsole.radius) return 'storePanel';
       return null;
     }
   };

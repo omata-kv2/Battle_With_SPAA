@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG, SHOP_ITEMS } from './config.js';
 import { YAJU_BOSSES, YAJU_BOSS_DIFFICULTIES, YAJU_REWARDS } from './yaju-config.js';
 import { state, getSkinUpgrade, getEquippedSkin, getEffectiveStats, getDifficultyById, saveGameData } from './state.js';
 import { $, setModeUI, updateHoldGauge } from './ui.js';
@@ -19,7 +19,8 @@ export function closeAllModals(){
     '#coopWaitModal',
     '#coopInviteModal',
     '#yajuSetupModal',
-    '#yajuBossSetupModal'
+    '#yajuBossSetupModal',
+    '#yajuIpadWarnModal'
   ];
   modals.forEach(id => {
     const el = $(id);
@@ -383,15 +384,98 @@ export function renderUpgradeList(){
   container.appendChild(skillCard);
 }
 
-export function openSkinStoreModal(){
+let currentStoreTab = 'items';
+
+export function openSkinStoreModal(defaultTab = 'items'){
   resetMovementInputs();
   state.modalOpen = true;
-  renderSkinStoreList();
+  switchStoreTab(defaultTab);
   $('#skinStoreModal').classList.add('visible');
 }
 
+export function switchStoreTab(tab = 'items'){
+  currentStoreTab = tab === 'units' ? 'units' : 'items';
+  const itemBtn = $('#tabItemShopBtn');
+  const unitBtn = $('#tabUnitShopBtn');
+  const itemsList = $('#storeItemsList');
+  const skinsList = $('#storeSkinsList');
+  const titleEl = $('#storeModalTitle');
+  const subEl = $('#storeModalSub');
+
+  if(itemBtn) itemBtn.classList.toggle('active', currentStoreTab === 'items');
+  if(unitBtn) unitBtn.classList.toggle('active', currentStoreTab === 'units');
+  if(itemsList) itemsList.classList.toggle('hidden', currentStoreTab !== 'items');
+  if(skinsList) skinsList.classList.toggle('hidden', currentStoreTab !== 'units');
+
+  if(currentStoreTab === 'items'){
+    if(titleEl) titleEl.textContent = 'アイテムショップ';
+    if(subEl) subEl.textContent = 'ゴールドやYAJUコインで戦闘用アイテムを購入できます（複数所持可）';
+    renderItemShopList();
+  } else {
+    if(titleEl) titleEl.textContent = '機体購入';
+    if(subEl) subEl.textContent = 'ゴールドを消費して新しい機体のロックを解除できます';
+    renderSkinStoreList();
+  }
+}
+
+export function renderItemShopList(){
+  const gEl = $('#storeGoldVal');
+  const yEl = $('#storeYajuCoinVal');
+  if(gEl) gEl.textContent = state.gold.toLocaleString();
+  if(yEl) yEl.textContent = (state.yajuCoins || 0).toLocaleString();
+
+  const container = $('#storeItemsList');
+  if(!container) return;
+  container.innerHTML = '';
+
+  SHOP_ITEMS.forEach(item => {
+    const owned = (state.inventory && state.inventory[item.id]) || 0;
+    const isYaju = item.currency === 'yaju';
+    const balance = isYaju ? (state.yajuCoins || 0) : state.gold;
+    const canAfford = balance >= item.price;
+    const unitLabel = isYaju ? 'Y' : 'G';
+
+    const card = document.createElement('div');
+    card.className = 'skin-card';
+    card.innerHTML = `
+      <div class="skin-swatch" style="background:${item.color};color:#071522">${item.shortName}</div>
+      <div class="skin-info">
+        <div class="skin-title">${item.name}</div>
+        <div class="skin-desc">${item.desc}</div>
+        <div class="skin-skill-tag">所持数: ${owned}個</div>
+      </div>
+      <button class="buy-btn" type="button" ${canAfford ? '' : 'disabled'}>${item.price.toLocaleString()} ${unitLabel} で購入</button>
+    `;
+    const btn = card.querySelector('button');
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if(isYaju){
+        if((state.yajuCoins || 0) >= item.price){
+          state.yajuCoins -= item.price;
+          state.inventory[item.id] = (state.inventory[item.id] || 0) + 1;
+        }
+      } else {
+        if(state.gold >= item.price){
+          state.gold -= item.price;
+          state.inventory[item.id] = (state.inventory[item.id] || 0) + 1;
+        }
+      }
+      saveGameData();
+      if(state.homeController && state.homeController.refreshCurrencyPanels){
+        state.homeController.refreshCurrencyPanels(state.gold, state.yajuCoins);
+      }
+      renderItemShopList();
+    });
+    container.appendChild(card);
+  });
+}
+
 export function renderSkinStoreList(){
-  $('#storeGoldVal').textContent = state.gold.toLocaleString();
+  const gEl = $('#storeGoldVal');
+  const yEl = $('#storeYajuCoinVal');
+  if(gEl) gEl.textContent = state.gold.toLocaleString();
+  if(yEl) yEl.textContent = (state.yajuCoins || 0).toLocaleString();
+
   const container = $('#storeSkinsList');
   container.innerHTML = '';
   CONFIG.SKINS.forEach(skin => {
@@ -418,6 +502,9 @@ export function renderSkinStoreList(){
           state.unlockedSkins.push(skin.id);
           saveGameData();
           if(state.skinController) state.skinController.refreshPedestals(state.unlockedSkins, state.selectedSkinId);
+          if(state.homeController && state.homeController.refreshCurrencyPanels){
+            state.homeController.refreshCurrencyPanels(state.gold, state.yajuCoins);
+          }
           renderSkinStoreList();
         }
       });
@@ -509,4 +596,11 @@ export function renderYajuBossSetupModal(){
       preview.innerHTML = `<b>【${bossObj.name}】 ${diffObj.name}</b><br>ボス体力: <b>${diffObj.hp}</b> / 敵攻撃力倍率: <b>${diffObj.atkMult.toFixed(1)}倍</b><br>討伐報酬: <b>YAJUコイン +${rewardCoins}枚</b>`;
     }
   }
+}
+
+export function openYajuIpadWarnModal(){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  $('#yajuIpadWarnModal')?.classList.add('visible');
 }
