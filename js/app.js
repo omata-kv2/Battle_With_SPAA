@@ -56,13 +56,9 @@ export function enterHome(){
   resetWhiteFade();
   hideEndScreen();
   closeAllModals();
-
   resetYajuState();
-<<<<<<< HEAD
   resetMatchInventoryUsage();
   updateInventoryBar();
-=======
->>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
   if(state.renderer){
     state.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, CONFIG.MAX_PIXEL_RATIO));
     resize();
