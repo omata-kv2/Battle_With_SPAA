@@ -785,6 +785,7 @@ body.yaju-boss-active .yaju-controls,
 }
 
 .yaju-ipad-warn-text{color:#ff4d6d;font-size:15px;font-weight:900;line-height:1.6;margin:12px 0;padding:10px;border-radius:8px;background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.45);}
+<<<<<<< HEAD
 
 
 /* ==========================================
@@ -862,3 +863,5 @@ body.yaju-boss-active .yaju-controls,
   from{opacity:.55}
   to{opacity:1}
 }
+=======
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2

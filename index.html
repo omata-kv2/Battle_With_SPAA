@@ -500,7 +500,10 @@ document.addEventListener("DOMContentLoaded", function(){
       "./js/controls.js",
       "./js/modals.js",
       "./js/multiplayer.js",
+<<<<<<< HEAD
       "./js/items.js",
+=======
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
       "./js/app.js"
     ];
     const problems = [];
@@ -532,7 +535,11 @@ document.addEventListener("DOMContentLoaded", function(){
     return "全ファイル200 OKですが、app.jsの読み込みに失敗しました。";
   }
 
+<<<<<<< HEAD
   import("./js/app.js?v=52").then(function(){
+=======
+  import("./js/app.js?v=51").then(function(){
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
     window.__spaaAppLoaded = true;
   }).catch(async function(err){
     var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);

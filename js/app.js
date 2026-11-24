@@ -9,7 +9,11 @@ import { initInputControls, resetMovementInputs } from './controls.js';
 import {
   closeAllModals, openCoopModal, openBattleSetupModal, renderBattleSetupModal,
   openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal,
+<<<<<<< HEAD
   openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal, switchStoreTab
+=======
+  openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
 } from './modals.js';
 import { resetCombatState, updateCombatSystem } from './player.js';
 import { useInventoryItem } from './items.js';
@@ -58,8 +62,11 @@ export function enterHome(){
   closeAllModals();
 
   resetYajuState();
+<<<<<<< HEAD
   resetMatchInventoryUsage();
   updateInventoryBar();
+=======
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
   if(state.renderer){
     state.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, CONFIG.MAX_PIXEL_RATIO));
     resize();
@@ -669,8 +676,11 @@ $('#yajuStartNormalBtn')?.addEventListener('pointerdown', (e) => {
 $('#yajuIpadConfirmBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   closeAllModals();
+<<<<<<< HEAD
   resetMatchInventoryUsage();
   updateInventoryBar();
+=======
+>>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
   startYajuNormalMode(pendingYajuNormalSettings);
 });
 
