@@ -18,12 +18,12 @@ export const CONFIG = {
     'beast': 'Beast'
   },
   DIFFICULTIES: [
-    { id: 'easy',      name: 'EASY',      jpName: '初級', waves: 5,  enemyMult: 1.0, speedMult: 0.85, obstacleCount: 16, groundHex: '#1b3a4b', skyHex: '#0a1e30', desc: '基本防衛演習。敵速度・数ともに標準的。' },
-    { id: 'normal',    name: 'NORMAL',    jpName: '中級', waves: 6,  enemyMult: 1.2, speedMult: 1.0,  obstacleCount: 24, groundHex: '#243b2c', skyHex: '#0f2419', desc: '実戦レベルの迎撃戦。戦闘機も混在。' },
-    { id: 'hard',      name: 'HARD',      jpName: '上級', waves: 7,  enemyMult: 1.45,speedMult: 1.18, obstacleCount: 34, groundHex: '#3d2c1e', skyHex: '#24160c', desc: '高密度飽和攻撃。素早い判断が必要。' },
-    { id: 'very_hard', name: 'VERY HARD', jpName: '超級', waves: 8,  enemyMult: 1.75,speedMult: 1.35, obstacleCount: 44, groundHex: '#3d1e2c', skyHex: '#240c18', desc: '猛攻フェーズ。機体強化が推奨される。' },
-    { id: 'hardcore',  name: 'HARDCORE',  jpName: '極限', waves: 9,  enemyMult: 2.1, speedMult: 1.55, obstacleCount: 56, groundHex: '#2b193d', skyHex: '#150924', desc: '容赦なき弾幕と高速飛翔体の嵐。' },
-    { id: 'insane',    name: 'INSANE',    jpName: '絶望', waves: 10, enemyMult: 2.5, speedMult: 1.8,  obstacleCount: 70, groundHex: '#3a0f14', skyHex: '#1a0407', desc: '人類最終防衛線。全10WAVEの極限戦。' }
+    { id: 'easy',      name: 'EASY',      jpName: '初級', waves: 5,  enemyMult: 1.0, speedMult: 0.85, obstacleCount: 16, groundHex: '#1b3a4b', skyHex: '#2fafde', desc: '基本防衛演習。敵速度・数ともに標準的。' },
+    { id: 'normal',    name: 'NORMAL',    jpName: '中級', waves: 6,  enemyMult: 1.2, speedMult: 1.0,  obstacleCount: 24, groundHex: '#243b2c', skyHex: '#2fafde', desc: '実戦レベルの迎撃戦。戦闘機も混在。' },
+    { id: 'hard',      name: 'HARD',      jpName: '上級', waves: 7,  enemyMult: 1.45,speedMult: 1.18, obstacleCount: 34, groundHex: '#3d2c1e', skyHex: '#b332c2', desc: '高密度飽和攻撃。素早い判断が必要。' },
+    { id: 'very_hard', name: 'VERY HARD', jpName: '超級', waves: 8,  enemyMult: 1.75,speedMult: 1.35, obstacleCount: 44, groundHex: '#3d1e2c', skyHex: '#b332c2', desc: '猛攻フェーズ。機体強化が推奨される。' },
+    { id: 'hardcore',  name: 'HARDCORE',  jpName: '弩級', waves: 9,  enemyMult: 2.1, speedMult: 1.55, obstacleCount: 56, groundHex: '#2b193d', skyHex: '#ad1717', desc: '容赦なき弾幕と高速飛翔体の嵐。' },
+    { id: 'insane',    name: 'INSANE',    jpName: '超弩級', waves: 10, enemyMult: 2.5, speedMult: 1.8,  obstacleCount: 70, groundHex: '#3a0f14', skyHex: '#ad1717', desc: '人類最終防衛線。全10WAVEの極限戦。' }
   ],
   AIR_STRIKE: {
     START_Y: 50,
