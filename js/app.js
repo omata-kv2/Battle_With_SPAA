@@ -1,4 +1,4 @@
-ーimport * as T from './libs/three.module.js';
+import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
 import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData, resetMatchInventoryUsage } from './state.js';
 import {
