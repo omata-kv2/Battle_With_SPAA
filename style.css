@@ -862,3 +862,113 @@ body.yaju-boss-active .yaju-controls,
   from{opacity:.55}
   to{opacity:1}
 }
+
+
+/* ==========================================
+   v5.3 情報機器（PDA）＆ マップ / 持ち物 / ガチャ / ？
+   ========================================== */
+.pda-open-btn{
+  position:fixed;
+  top:max(12px,env(safe-area-inset-top));
+  right:max(12px,env(safe-area-inset-right));
+  z-index:26;
+  pointer-events:auto;
+  padding:8px 14px;
+  border-radius:12px;
+  border:1px solid var(--accent);
+  background:var(--panel);
+  color:var(--text);
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);
+  touch-action:manipulation;
+}
+.pda-panel{
+  border:2px solid var(--accent2);
+  background:rgba(7,20,34,.96);
+}
+.pda-header{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--border);
+}
+.pda-header-title{font-size:14px;font-weight:900;color:var(--accent);letter-spacing:.05em}
+.pda-nav-btn{
+  padding:5px 10px;border-radius:8px;border:1px solid var(--border);
+  background:#0e2a42;color:var(--text);font-size:12px;font-weight:800;cursor:pointer;
+}
+.pda-app-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:6px 0;
+}
+.pda-app-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:16px 8px;border-radius:14px;border:1px solid var(--border);
+  background:#0c253b;color:var(--text);cursor:pointer;touch-action:manipulation;
+}
+.pda-app-btn span{font-size:26px;line-height:1}
+.pda-app-btn b{font-size:12px}
+.pda-app-btn.pda-app-mystery{border-color:#ff4d6d;background:rgba(60,12,24,.75)}
+
+.pda-map-stage{display:flex;justify-content:center;margin:6px 0 10px}
+.pda-map-canvas{
+  position:relative;width:240px;height:240px;
+  background:#091a2b;border:2px solid #38c8f0;border-radius:10px;
+  background-image:linear-gradient(rgba(56,200,240,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(56,200,240,.1) 1px,transparent 1px);
+  background-size:24px 24px;
+}
+.pda-map-player{
+  position:absolute;width:10px;height:10px;border-radius:50%;
+  background:#fff;border:2px solid #00f5d4;transform:translate(-50%,-50%);
+  pointer-events:none;z-index:2;
+}
+.pda-map-portal-dot{
+  position:absolute;width:24px;height:24px;border-radius:50%;
+  border:2px solid #fff;transform:translate(-50%,-50%);
+  cursor:pointer;z-index:3;touch-action:manipulation;
+}
+.pda-map-confirm{
+  background:#0a2236;border:1px solid var(--gold);border-radius:10px;
+  padding:10px;margin:8px 0;text-align:center;
+}
+.pda-map-confirm p{font-size:13px;font-weight:800;color:#fff;margin-bottom:8px}
+.pda-map-legend{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:8px 12px;
+  margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;
+}
+.pda-legend-item{display:flex;align-items:center;gap:5px;color:#d6f2ff;font-weight:700}
+.pda-legend-item i{display:inline-block;width:10px;height:10px;border-radius:50%;border:1px solid #fff}
+
+.pda-bag-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.pda-bag-slot{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 4px;border-radius:10px;border:1px solid var(--border);
+  background:#0a2033;color:var(--text);cursor:pointer;touch-action:manipulation;
+}
+.pda-bag-slot.selected{border:2px solid var(--gold);background:rgba(255,210,63,.14)}
+.pda-slot-num{font-size:10px;color:var(--muted);font-weight:700}
+.pda-bag-slot strong{font-size:12px}
+.pda-bag-slot small{font-size:10px;color:var(--gold)}
+
+.pda-gacha-box{
+  background:#091f32;border:1px solid var(--border);border-radius:12px;padding:16px;
+}
+.pda-gacha-msg{
+  margin-top:12px;min-height:20px;font-size:13px;font-weight:800;color:#ff4d6d;
+}
+
+/* ？アプリ 暗転 & 動画再生 */
+.pda-mystery-overlay{
+  position:fixed;inset:0;background:#000;z-index:95;
+  display:flex;align-items:center;justify-content:center;
+}
+.pda-mystery-status{
+  position:relative;z-index:3;color:#eaf8ff;font-size:18px;font-weight:800;
+  letter-spacing:.08em;animation:mysteryBlink 2.2s ease-in-out infinite;
+}
+@keyframes mysteryBlink{
+  0%,100%{opacity:.2}
+  50%{opacity:1}
+}
+.pda-king-video{
+  position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;background:#000;
+}

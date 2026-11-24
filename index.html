@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#071522">
-<title>Cooking With SPAA v5.2</title>
+<title>Cooking With SPAA v5.3</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
@@ -51,6 +51,7 @@ window.addEventListener("unhandledrejection", function(e){
       </div>
     </div>
 
+    <button type="button" id="pdaOpenBtn" class="pda-open-btn hidden" aria-label="情報機器を開く">📱 情報機器</button>
     <div id="modeBanner" class="hidden-mode">HOME BASE</div>
     <div id="toastBanner" class="hidden"></div>
     
@@ -338,6 +339,72 @@ window.addEventListener("unhandledrejection", function(e){
   </div>
 </div>
 
+
+<!-- 情報機器モーダル（ホーム専用） -->
+<div id="pdaModal" class="modal-overlay">
+  <div class="modal-panel pda-panel">
+    <div class="pda-header">
+      <button type="button" id="pdaBackBtn" class="pda-nav-btn hidden">← 戻る</button>
+      <span id="pdaHeaderTitle" class="pda-header-title">情報機器 — HOME</span>
+      <button type="button" id="pdaCloseBtn" class="pda-nav-btn">✕</button>
+    </div>
+
+    <!-- アプリ一覧 -->
+    <div id="pdaView_home" class="pda-app-grid">
+      <button type="button" id="pdaAppMapBtn" class="pda-app-btn"><span>🗺️</span><b>マップ</b></button>
+      <button type="button" id="pdaAppBagBtn" class="pda-app-btn"><span>🎒</span><b>持ち物</b></button>
+      <button type="button" id="pdaAppStoreBtn" class="pda-app-btn"><span>🛒</span><b>ストア</b></button>
+      <button type="button" id="pdaAppGachaBtn" class="pda-app-btn"><span>🎰</span><b>ガチャ</b></button>
+      <button type="button" id="pdaAppFriendBtn" class="pda-app-btn"><span>👥</span><b>フレンド</b></button>
+      <button type="button" id="pdaAppMysteryBtn" class="pda-app-btn pda-app-mystery"><span>❓</span><b>？</b></button>
+    </div>
+
+    <!-- マップアプリ -->
+    <div id="pdaView_map" class="pda-subview hidden">
+      <p class="modal-sub" style="text-align:center;margin-bottom:8px;">ポータルをタップするとその場所へ移動できます（白点＝現在地）</p>
+      <div class="pda-map-stage">
+        <div id="pdaMapCanvas" class="pda-map-canvas"></div>
+      </div>
+      <div id="pdaMapConfirmBox" class="pda-map-confirm hidden">
+        <p id="pdaMapConfirmText">〜ポータルへ移動しますか？</p>
+        <div class="setup-footer-btns">
+          <button type="button" id="pdaMapNoBtn" class="action-btn secondary">いいえ</button>
+          <button type="button" id="pdaMapYesBtn" class="action-btn">はい</button>
+        </div>
+      </div>
+      <div id="pdaMapLegend" class="pda-map-legend"></div>
+    </div>
+
+    <!-- 持ち物アプリ -->
+    <div id="pdaView_bag" class="pda-subview hidden">
+      <p class="modal-sub" style="margin-bottom:8px;">変更したい枠を選び、下のアイテムをタップしてセットしてください</p>
+      <div id="pdaBagSlots" class="pda-bag-slots"></div>
+      <button type="button" id="pdaBagClearBtn" class="action-btn secondary" style="padding:7px 10px;font-size:12px;margin-bottom:10px;">選択中の枠を外す（空にする）</button>
+      <div id="pdaBagItemList" class="skin-list"></div>
+    </div>
+
+    <!-- ガチャアプリ（試験導入版） -->
+    <div id="pdaView_gacha" class="pda-subview hidden" style="text-align:center;">
+      <div class="pda-gacha-box">
+        <div class="eyebrow">EXPERIMENTAL GACHA</div>
+        <h2 style="margin:6px 0;">YAJUガチャ（試験導入版）</h2>
+        <p class="modal-sub">所持YAJUコイン: <b id="pdaGachaCoins" style="color:#ff9ebb;">0</b> Y</p>
+        <div class="setup-footer-btns" style="margin-top:12px;">
+          <button type="button" id="pdaGachaSingleBtn" class="action-btn">1連（300Y）</button>
+          <button type="button" id="pdaGachaMultiBtn" class="action-btn upgrade-open-btn" style="margin-bottom:0;">10連（3000Y）</button>
+        </div>
+        <div id="pdaGachaMsg" class="pda-gacha-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ？アプリ用 暗転・読み込み・KING.mp4再生オーバーレイ -->
+<div id="pdaMysteryOverlay" class="pda-mystery-overlay hidden">
+  <div id="pdaMysteryStatus" class="pda-mystery-status hidden">🎥動画を読み込んでいます…</div>
+  <video id="pdaKingVideo" class="pda-king-video hidden" playsinline webkit-playsinline preload="auto"></video>
+</div>
+
 <!-- ストアモーダル（アイテムショップ / 機体購入） -->
 <div id="skinStoreModal" class="modal-overlay">
   <div class="modal-panel">
@@ -501,6 +568,7 @@ document.addEventListener("DOMContentLoaded", function(){
       "./js/modals.js",
       "./js/multiplayer.js",
       "./js/items.js",
+      "./js/pda.js",
       "./js/app.js"
     ];
     const problems = [];
@@ -532,7 +600,7 @@ document.addEventListener("DOMContentLoaded", function(){
     return "全ファイル200 OKですが、app.jsの読み込みに失敗しました。";
   }
 
-  import("./js/app.js?v=52").then(function(){
+  import("./js/app.js?v=53").then(function(){
     window.__spaaAppLoaded = true;
   }).catch(async function(err){
     var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);
