@@ -9,11 +9,7 @@ import { initInputControls, resetMovementInputs } from './controls.js';
 import {
   closeAllModals, openCoopModal, openBattleSetupModal, renderBattleSetupModal,
   openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal,
-<<<<<<< HEAD
   openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal, switchStoreTab
-=======
-  openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal
->>>>>>> b4907ccc94f051a25c4a34e4408bd8a11f6783e2
 } from './modals.js';
 import { resetCombatState, updateCombatSystem } from './player.js';
 import { useInventoryItem } from './items.js';
