@@ -13,6 +13,7 @@ import {
 } from './modals.js';
 import { resetCombatState, updateCombatSystem } from './player.js';
 import { useInventoryItem } from './items.js';
+import { initPdaEvents } from './pda.js';
 import { clearEnemiesAndFx, updateEnemiesAndWave } from './enemies.js';
 import { initFallMissileMode, updateFallMissileMode } from './mode-fall-missile.js';
 import { initAirStrikeMode, updateAirStrikeMode, generateAirStrikeMissionData } from './mode-air-strike.js';
@@ -290,6 +291,7 @@ async function init(){
     loadGameData();
     initInputControls(getCoopContext);
     initInventoryBar((itemId) => useInventoryItem(itemId, getCoopContext()));
+    initPdaEvents();
 
     progress(15, '3Dレンダラー初期化中...');
     state.renderer = new T.WebGLRenderer({ canvas: $('#scene'), antialias: true, powerPreference: 'high-performance' });

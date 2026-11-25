@@ -139,6 +139,8 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
   const battleEls = document.querySelectorAll('.battle-only');
   const fireWrap = $('#fireWrap');
 
+  const pdaBtn = $('#pdaOpenBtn');
+  if(pdaBtn) pdaBtn.classList.toggle('hidden', mode !== 'home');
   if(mode === 'home'){
     const stickEl = $('#stick');
     if(stickEl) stickEl.classList.remove('hidden-mode');
@@ -344,13 +346,14 @@ let invBarInitialized = false;
 export function initInventoryBar(onUseItem){
   if(invBarInitialized) return;
   invBarInitialized = true;
-  SHOP_ITEMS.forEach((item, idx) => {
+  [0, 1, 2].forEach((idx) => {
     const slot = $(`#invSlot_${idx}`);
     if(!slot) return;
     slot.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if(onUseItem) onUseItem(item.id);
+      const itemId = state.equippedItems && state.equippedItems[idx];
+      if(itemId && onUseItem) onUseItem(itemId);
     });
   });
   updateInventoryBar();
@@ -362,22 +365,32 @@ export function showInventoryBar(visible){
 }
 
 export function updateInventoryBar(){
-  SHOP_ITEMS.forEach((item, idx) => {
+  [0, 1, 2].forEach((idx) => {
     const slot = $(`#invSlot_${idx}`);
     if(!slot) return;
     const nameEl = slot.querySelector('.inv-name');
     const cntEl = slot.querySelector('.inv-count');
+    const itemId = state.equippedItems && state.equippedItems[idx];
+    const item = itemId ? SHOP_ITEMS.find(it => it.id === itemId) : null;
+
+    slot.classList.remove('inv-empty', 'inv-used');
+    if(!item){
+      slot.classList.add('inv-empty');
+      if(nameEl){ nameEl.textContent = '空'; nameEl.style.color = ''; }
+      if(cntEl) cntEl.classList.add('hidden');
+      return;
+    }
+
     const count = (state.inventory && state.inventory[item.id]) || 0;
     const used = !!(state.usedItemsInMatch && state.usedItemsInMatch[item.id]);
 
-    slot.classList.remove('inv-empty', 'inv-used');
     if(count <= 0 && !used){
       slot.classList.add('inv-empty');
-      if(nameEl) nameEl.textContent = item.shortName;
+      if(nameEl){ nameEl.textContent = item.shortName; nameEl.style.color = ''; }
       if(cntEl) cntEl.classList.add('hidden');
     } else if(used){
       slot.classList.add('inv-used');
-      if(nameEl) nameEl.textContent = '使用済';
+      if(nameEl){ nameEl.textContent = '使用済'; nameEl.style.color = ''; }
       if(cntEl){
         if(count > 0){
           cntEl.textContent = String(count);

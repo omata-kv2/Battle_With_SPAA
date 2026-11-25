@@ -20,7 +20,8 @@ export function closeAllModals(){
     '#coopInviteModal',
     '#yajuSetupModal',
     '#yajuBossSetupModal',
-    '#yajuIpadWarnModal'
+    '#yajuIpadWarnModal',
+    '#pdaModal'
   ];
   modals.forEach(id => {
     const el = $(id);
