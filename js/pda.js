@@ -349,7 +349,7 @@ function playGachaCutscene(rarity){
       try{ ussrAudio.load(); }catch(_e){}
     } else {
       loadWithFallback(imgEl, ['./assets/chasers/inmu_king.png', './assets/inmu_king.png']);
-      loadWithFallback(videoEl, ['./assets/videos/114514.mp4', './assets/114514.mp4']);
+      loadWithFallback(videoEl, ['./assets/videos/114514.mp3', './assets/114514.mp3']);
       try{ videoEl.load(); }catch(_e){}
     }
 
