@@ -1,5 +1,6 @@
 import { SHOP_ITEMS } from './config.js';
-import { state } from './state.js';
+import { playSfx } from './sfx.js';
+import { state, getEquippedSkin, getRequiredXpForLevel } from './state.js';
 export const $ = (sel) => document.querySelector(sel);
 
 let explosionTicksBuilt = false;
@@ -34,8 +35,10 @@ export function showExplosionChargeMeter(visible){
   if(visible){
     ensureExplosionMeterTicks();
     el.classList.remove('hidden');
+    el.classList.add('inv-offset');
   } else {
     el.classList.add('hidden');
+    el.classList.remove('inv-offset');
   }
 }
 
@@ -135,23 +138,22 @@ export function resetWhiteFade(){
 }
 
 export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE'){
-  const banner = $('#modeBanner');
   const battleEls = document.querySelectorAll('.battle-only');
   const fireWrap = $('#fireWrap');
 
   const pdaBtn = $('#pdaOpenBtn');
   if(pdaBtn) pdaBtn.classList.toggle('hidden', mode !== 'home');
+  const plateEl = $('#playerPlate');
+  if(plateEl) plateEl.classList.toggle('hidden-mode', mode === 'battle');
+  const dpsEl = $('#testDpsHud');
+  if(dpsEl) dpsEl.classList.toggle('hidden-mode', mode !== 'test');
+  updatePlayerPlate(false);
   if(mode === 'home'){
     const stickEl = $('#stick');
     if(stickEl) stickEl.classList.remove('hidden-mode');
     showInventoryBar(false);
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
-    if(banner){
-      banner.classList.remove('hidden-mode');
-      const coopTag = isCoop ? (isHost ? ' [共闘ホスト]' : ' [共闘ゲスト]') : '';
-      banner.textContent = `HOME BASE — 装備機体: ${skin ? skin.name : 'Origin'}${coopTag}`;
-    }
     battleEls.forEach(el => el.classList.add('hidden-mode'));
   } else if(mode === 'skin'){
     const stickEl = $('#stick');
@@ -159,15 +161,22 @@ export function setModeUI(mode, skin, isCoop, isHost, battleMode = 'FALL_MISSILE
     showInventoryBar(false);
     clearLaserAttackButtons();
     showExplosionChargeMeter(false);
-    if(banner){
-      banner.classList.remove('hidden-mode');
-      banner.textContent = `UNIT HANGAR — 装備中: ${skin ? skin.name : 'Origin'}`;
-    }
     battleEls.forEach(el => el.classList.add('hidden-mode'));
+  } else if(mode === 'test'){
+    const stickEl = $('#stick');
+    if(stickEl) stickEl.classList.remove('hidden-mode');
+    showInventoryBar(false);
+    battleEls.forEach(el => el.classList.remove('hidden-mode'));
+    const statsEl = $('.stats');
+    const annEl = $('#announce');
+    if(statsEl) statsEl.classList.add('hidden-mode');
+    if(annEl) annEl.classList.add('hidden-mode');
+    showExplosionChargeMeter(skin && skin.attackType === 'explosion');
   } else if(mode === 'battle'){
+    const statsEl = $('.stats');
+    if(statsEl) statsEl.classList.remove('hidden-mode');
     showInventoryBar(battleMode !== 'YAJU_DEAD');
     updateInventoryBar();
-    if(banner) banner.classList.add('hidden-mode');
     const skillBtn = $('#skillBtn');
     if(skillBtn) skillBtn.classList.remove('hidden-mode');
     battleEls.forEach(el => el.classList.remove('hidden-mode'));
@@ -418,4 +427,41 @@ export function triggerBlueWhiteFadeOut(){
   ov.classList.remove('fading');
   void ov.offsetWidth;
   ov.classList.add('fading');
+}
+
+export function updatePlayerPlate(triggerGlow = false){
+  const plate = $('#playerPlate');
+  if(!plate) return;
+  const lv = state.playerLevel || 1;
+  const xp = state.playerXp || 0;
+  const req = getRequiredXpForLevel(lv);
+  const ratio = Math.max(0, Math.min(1, xp / req));
+  const circ = 100.53;
+  const circleEl = $('#plateXpCircle');
+  if(circleEl){
+    circleEl.setAttribute('stroke-dasharray', `${(ratio * circ).toFixed(1)} ${circ}`);
+  }
+  const lvEl = $('#plateLevelNum');
+  const nameEl = $('#plateName');
+  const codeEl = $('#plateCode');
+  const skinEl = $('#plateSkin');
+  if(lvEl) lvEl.textContent = String(lv);
+  if(nameEl) nameEl.textContent = state.username || '---';
+  if(codeEl) codeEl.textContent = state.playerCode || 'SPAA------';
+  if(skinEl) skinEl.textContent = getEquippedSkin().name;
+
+  if(triggerGlow){
+    plate.classList.remove('level-up-glow');
+    void plate.offsetWidth;
+    plate.classList.add('level-up-glow');
+    playSfx('level_up', 0.8);
+    showToast(`LEVEL UP! Lv.${lv} になりました！`, 2600);
+  }
+}
+
+export function updateTestDpsUI(dpsVal){
+  const el = $('#testDpsVal');
+  if(!el) return;
+  const rounded = Math.max(0, Math.round(dpsVal || 0));
+  el.textContent = String(rounded);
 }

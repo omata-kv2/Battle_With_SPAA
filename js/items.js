@@ -1,7 +1,9 @@
 import * as T from './libs/three.module.js';
 import { SHOP_ITEMS } from './config.js';
+import { YAJU_CONFIG } from './yaju-config.js';
 import { state, saveGameData } from './state.js';
 import { showToast, updateInventoryBar, triggerBlueWhiteFadeOut } from './ui.js';
+import { playSfx } from './sfx.js';
 import { applyEnemyDamage } from './enemies.js';
 import { yajuState, applyYajuGlobalNuke, activateYajuEmpShield } from './mode-yaju-maze.js';
 
@@ -49,6 +51,7 @@ export function useInventoryItem(itemId, coopCtx = {}){
 
   state.inventory[itemId] = count - 1;
   state.usedItemsInMatch[itemId] = true;
+  playSfx('item_use', 0.8);
   saveGameData();
   updateInventoryBar();
 
@@ -82,5 +85,53 @@ export function useInventoryItem(itemId, coopCtx = {}){
       }
     }
     showToast(`${itemDef.name}炸裂！敵7秒停止＆1000ダメージ！`);
+    return;
+  }
+
+  if(itemId === 'hp_full'){
+    if(state.activeBattleMode === 'YAJU_BOSS'){
+      const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
+      yajuState.playerHp = maxHp;
+      const fill = document.getElementById('yajuHpFill');
+      const txt = document.getElementById('yajuHpText');
+      if(fill) fill.style.width = '100%';
+      if(txt) txt.textContent = `${maxHp} / ${maxHp}`;
+    } else {
+      state.peace = 100;
+    }
+    showToast('HP完全回復ストーン使用！体力全回復！');
+    return;
+  }
+
+  if(itemId === 'hp_half'){
+    if(state.activeBattleMode === 'YAJU_BOSS'){
+      const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
+      yajuState.playerHp = Math.min(maxHp, yajuState.playerHp + Math.ceil(maxHp / 2));
+      const fill = document.getElementById('yajuHpFill');
+      const txt = document.getElementById('yajuHpText');
+      if(fill) fill.style.width = `${(yajuState.playerHp / maxHp) * 100}%`;
+      if(txt) txt.textContent = `${Math.ceil(yajuState.playerHp)} / ${maxHp}`;
+    } else {
+      state.peace = Math.min(100, state.peace + 50);
+    }
+    showToast('HP半分回復ストーン使用！体力半分回復！');
+    return;
+  }
+
+  if(itemId === 'power_double'){
+    state.powerBuffTimer = 10.0;
+    showToast('火力2倍ストーン発動！10秒間ダメージ2倍！');
+    return;
+  }
+
+  if(itemId === 'speed_up'){
+    state.speedBuffTimer = 10.0;
+    showToast('移動速度上昇ストーン発動！10秒間移動速度1.5倍！');
+    return;
+  }
+
+  if(itemId === 'beast_god_stone'){
+    state.beastGodActive = true;
+    showToast('獣神化パワーストーン発動！この試合の報酬・XP獲得2倍！');
   }
 }

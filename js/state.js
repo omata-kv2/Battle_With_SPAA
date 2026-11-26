@@ -25,9 +25,12 @@ export const state = {
   earnedGoldInMatch: 0,
   gold: 0,
   yajuCoins: 0,
-  inventory: { emp_shield: 0, hydrogen_bomb: 0, yaju_nuke: 0 },
+  inventory: { emp_shield: 0, hydrogen_bomb: 0, yaju_nuke: 0, hp_full: 0, hp_half: 0, power_double: 0, speed_up: 0, beast_god_stone: 0 },
   equippedItems: ['emp_shield', 'hydrogen_bomb', 'yaju_nuke'],
-  usedItemsInMatch: { emp_shield: false, hydrogen_bomb: false, yaju_nuke: false },
+  usedItemsInMatch: {},
+  powerBuffTimer: 0,
+  speedBuffTimer: 0,
+  beastGodActive: false,
   enemyFreezeTimer: 0,
   enemyFreezeType: null,
 
@@ -38,6 +41,10 @@ export const state = {
   z: 9,
 
   username: '',
+  playerCode: '',
+  playerLevel: 1,
+  playerXp: 0,
+  friends: [],
   unlockedSkins: ['Origin'],
   selectedSkinId: 'Origin',
   pendingSelectedSkinId: 'Origin',
@@ -47,6 +54,9 @@ export const state = {
   skinController: null,
   triggerCooldown: 0,
   panelHoldTime: 0,
+  portalHoldTime: 0,
+  portalHoldTarget: null,
+  testDpsHistory: [],
   lastFrameTime: performance.now(),
   syncTick: 0,
 
@@ -185,13 +195,31 @@ export function loadGameData(){
     }catch(e){}
   }
 
+  const savedCode = localStorage.getItem('spaa_player_code');
+  if(savedCode) state.playerCode = savedCode;
+  if(!state.playerCode) state.playerCode = generatePlayerCode();
+
+  const savedLv = parseInt(localStorage.getItem('spaa_player_level'), 10);
+  if(!Number.isNaN(savedLv) && savedLv >= 1) state.playerLevel = savedLv;
+
+  const savedXp = parseInt(localStorage.getItem('spaa_player_xp'), 10);
+  if(!Number.isNaN(savedXp) && savedXp >= 0) state.playerXp = savedXp;
+
+  const savedFriends = localStorage.getItem('spaa_friends');
+  if(savedFriends){
+    try{
+      const arr = JSON.parse(savedFriends);
+      if(Array.isArray(arr)) state.friends = arr;
+    }catch(e){}
+  }
+
   const savedInv = localStorage.getItem('spaa_inventory');
   if(savedInv){
     try{
       const invObj = JSON.parse(savedInv);
       if(invObj && typeof invObj === 'object'){
-        for(const k of ['emp_shield', 'hydrogen_bomb', 'yaju_nuke']){
-          const v = parseInt(invObj[k], 10);
+        for(const [k, rawV] of Object.entries(invObj)){
+          const v = parseInt(rawV, 10);
           if(!Number.isNaN(v) && v >= 0) state.inventory[k] = v;
         }
       }
@@ -237,6 +265,11 @@ export function saveGameData(){
   localStorage.setItem('spaa_gold', String(state.gold));
   localStorage.setItem('spaa_yaju_coins', String(state.yajuCoins || 0));
   localStorage.setItem('spaa_inventory', JSON.stringify(state.inventory));
+  if(!state.playerCode) state.playerCode = generatePlayerCode();
+  localStorage.setItem('spaa_player_code', state.playerCode);
+  localStorage.setItem('spaa_player_level', String(state.playerLevel || 1));
+  localStorage.setItem('spaa_player_xp', String(state.playerXp || 0));
+  localStorage.setItem('spaa_friends', JSON.stringify(state.friends || []));
   localStorage.setItem('spaa_equipped_items', JSON.stringify(state.equippedItems));
   localStorage.setItem('spaa_unlocked_skins', JSON.stringify(state.unlockedSkins));
   localStorage.setItem('spaa_selected_skin', state.selectedSkinId);
@@ -244,7 +277,116 @@ export function saveGameData(){
 }
 
 export function resetMatchInventoryUsage(){
-  state.usedItemsInMatch = { emp_shield: false, hydrogen_bomb: false, yaju_nuke: false };
+  state.usedItemsInMatch = {};
   state.enemyFreezeTimer = 0;
   state.enemyFreezeType = null;
+  state.powerBuffTimer = 0;
+  state.speedBuffTimer = 0;
+  state.beastGodActive = false;
+}
+
+export function generatePlayerCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'SPAA-';
+  for(let i = 0; i < 6; i++){
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+export function getRequiredXpForLevel(lv = state.playerLevel){
+  return Math.max(1, lv) * 100;
+}
+
+let levelUpListeners = [];
+export function onPlayerLevelUp(cb){
+  levelUpListeners.push(cb);
+}
+
+export function gainXp(rawAmount){
+  const mult = state.beastGodActive ? 2 : 1;
+  const amount = Math.max(0, Math.round(rawAmount * mult));
+  if(amount <= 0) return 0;
+
+  state.playerXp = (state.playerXp || 0) + amount;
+  let leveledUp = false;
+  while(state.playerXp >= getRequiredXpForLevel(state.playerLevel)){
+    state.playerXp -= getRequiredXpForLevel(state.playerLevel);
+    state.playerLevel = (state.playerLevel || 1) + 1;
+    leveledUp = true;
+  }
+  saveGameData();
+  levelUpListeners.forEach(cb => cb(leveledUp));
+  return amount;
+}
+
+export function addFriendByCode(codeRaw, nameRaw = ''){
+  const code = (codeRaw || '').trim().toUpperCase();
+  if(!code) return { ok: false, msg: 'プレイヤーコードを入力してください' };
+  if(code === state.playerCode) return { ok: false, msg: '自分のコードは追加できません' };
+  if(!Array.isArray(state.friends)) state.friends = [];
+  if(state.friends.some(f => f.code === code)){
+    return { ok: false, msg: 'すでにフレンド登録済みです' };
+  }
+  const name = (nameRaw || '').trim() || `プレイヤー(${code.slice(-4)})`;
+  state.friends.push({ code, name });
+  saveGameData();
+  return { ok: true, msg: `${name} をフレンドに追加しました！` };
+}
+
+export function exportSaveCode(){
+  if(!state.playerCode) state.playerCode = generatePlayerCode();
+  const payload = {
+    v: 54,
+    u: state.username || '',
+    c: state.playerCode,
+    lv: state.playerLevel || 1,
+    xp: state.playerXp || 0,
+    g: state.gold || 0,
+    y: state.yajuCoins || 0,
+    us: state.unlockedSkins || ['Origin'],
+    ss: state.selectedSkinId || 'Origin',
+    su: state.skinUpgrades || {},
+    inv: state.inventory || {},
+    eq: state.equippedItems || ['emp_shield', 'hydrogen_bomb', 'yaju_nuke'],
+    fr: state.friends || []
+  };
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  for(const b of bytes) bin += String.fromCharCode(b);
+  return 'SPAA54:' + btoa(bin);
+}
+
+export function importSaveCode(rawStr){
+  const str = (rawStr || '').trim();
+  if(!str.startsWith('SPAA54:')) return { ok: false, msg: '引き継ぎコードの形式が正しくありません' };
+  try{
+    const b64 = str.slice(7);
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const json = new TextDecoder().decode(bytes);
+    const d = JSON.parse(json);
+    if(!d || typeof d !== 'object') throw new Error('invalid');
+
+    state.username = d.u || 'パルス防衛官';
+    state.playerCode = d.c || generatePlayerCode();
+    state.playerLevel = Math.max(1, parseInt(d.lv, 10) || 1);
+    state.playerXp = Math.max(0, parseInt(d.xp, 10) || 0);
+    state.gold = Math.max(0, parseInt(d.g, 10) || 0);
+    state.yajuCoins = Math.max(0, parseInt(d.y, 10) || 0);
+    if(Array.isArray(d.us) && d.us.length > 0) state.unlockedSkins = Array.from(new Set(d.us.map(migrateSkinId)));
+    if(!state.unlockedSkins.includes('Origin')) state.unlockedSkins.unshift('Origin');
+    state.selectedSkinId = migrateSkinId(d.ss || 'Origin');
+    if(d.su && typeof d.su === 'object') state.skinUpgrades = d.su;
+    if(d.inv && typeof d.inv === 'object') state.inventory = { ...state.inventory, ...d.inv };
+    if(Array.isArray(d.eq) && d.eq.length === 3) state.equippedItems = d.eq;
+    if(Array.isArray(d.fr)) state.friends = d.fr;
+
+    saveGameData();
+    return { ok: true, msg: '引き継ぎデータを復元しました！' };
+  }catch(e){
+    return { ok: false, msg: '引き継ぎコードの復元に失敗しました' };
+  }
 }

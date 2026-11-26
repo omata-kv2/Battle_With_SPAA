@@ -1,5 +1,5 @@
 import * as T from './libs/three.module.js';
-import { state, getEquippedSkin, getEffectiveStats, saveGameData } from './state.js';
+import { state, getEquippedSkin, getEffectiveStats, saveGameData, gainXp } from './state.js';
 import {
   YAJU_CONFIG, YAJU_BOSSES, YAJU_BOSS_DIFFICULTIES, YAJU_REWARDS,
   YAJU_CHASER_IMAGES, YAJU_BOOM_IMAGE, YAJU_IZAN_IMAGE, YAJU_NEEDLE_COLORS
@@ -12,6 +12,7 @@ import {
   buildYajuBossScene, buildYajuDeadStage
 } from './yaju-world.js';
 import { $, showToast, setModeUI, showExplosionChargeMeter } from './ui.js';
+import { playSfx } from './sfx.js';
 import { resetCombatState, initLaserTurretDeployState } from './player.js';
 
 let texLoader = null;
@@ -40,6 +41,7 @@ export const yajuState = {
   rocketAmmo: 0,
   stamina: YAJU_CONFIG.maxStamina,
   playerHp: YAJU_CONFIG.playerMaxHp,
+  playerMaxHp: YAJU_CONFIG.playerMaxHp,
   sprintHeld: false,
   isDashing: false,
   dashTimer: 0,
@@ -558,7 +560,10 @@ function initYajuStage(subMode){
     state.yaw = Math.atan2(-cornerPos.x, -cornerPos.z) + Math.PI;
     state.pitch = 0;
 
-    yajuState.playerHp = YAJU_CONFIG.playerMaxHp;
+    const unitEff = getEffectiveStats(getEquippedSkin());
+    const unitMaxHp = Math.max(1, unitEff.hp || YAJU_CONFIG.playerMaxHp);
+    yajuState.playerMaxHp = unitMaxHp;
+    yajuState.playerHp = unitMaxHp;
     yajuState.rocketAmmo = 3;
 
     setupEnemies([], cornerPos);
@@ -572,7 +577,7 @@ function initYajuStage(subMode){
     el('yajuControls')?.classList.remove('hidden');
     el('yajuFloorDisplay').textContent = subMode === 'boss_world_enemy' ? 'WORLD ENEMY' : '獣王';
     el('yajuHpFill').style.width = '100%';
-    el('yajuHpText').textContent = `${YAJU_CONFIG.playerMaxHp} / ${YAJU_CONFIG.playerMaxHp}`;
+    el('yajuHpText').textContent = `${yajuState.playerMaxHp} / ${yajuState.playerMaxHp}`;
     updateRocketUI();
   } else if(isDead){
     state.gameMode = 'battle';
@@ -749,6 +754,7 @@ export function applyYajuPlayerDamage(targetMesh, dmg){
 
   if(eObj.isWorldEnemy || eObj.isBeastKing){
     eObj.hp = Math.max(0, eObj.hp - dmg);
+    playSfx('enemy_hit', 0.6);
     updateBossHpUI(eObj);
     if(eObj.hp <= 0){
       const label = eObj.isWorldEnemy ? 'World Enemy' : '獣王';
@@ -761,6 +767,7 @@ export function applyYajuPlayerDamage(targetMesh, dmg){
       eObj.planeMesh.material = createEnemyMaterial(enemyTextureBoom);
     }
     playYajuAudio('se-boom', 1.0);
+    gainXp(20);
   }
 }
 
@@ -782,8 +789,9 @@ function damagePlayer(amount, msg){
 
   const hpFill = el('yajuHpFill');
   const hpText = el('yajuHpText');
-  if(hpFill) hpFill.style.width = `${(yajuState.playerHp / YAJU_CONFIG.playerMaxHp) * 100}%`;
-  if(hpText) hpText.textContent = `${Math.ceil(yajuState.playerHp)} / ${YAJU_CONFIG.playerMaxHp}`;
+  const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
+  if(hpFill) hpFill.style.width = `${(yajuState.playerHp / maxHp) * 100}%`;
+  if(hpText) hpText.textContent = `${Math.ceil(yajuState.playerHp)} / ${maxHp}`;
 
   if(msg) showYajuMessage(msg);
   if(yajuState.playerHp <= 0){
@@ -875,8 +883,10 @@ function finishBossWin(bossName){
   updateRocketUI();
 
   const mult = yajuState.bossDiff ? yajuState.bossDiff.atkMult : 1.0;
-  const earnedCoins = Math.round(YAJU_REWARDS.BOSS_BASE_COINS * mult);
+  const rewardMult = state.beastGodActive ? 2 : 1;
+  const earnedCoins = Math.round(YAJU_REWARDS.BOSS_BASE_COINS * mult) * rewardMult;
   state.yajuCoins = (state.yajuCoins || 0) + earnedCoins;
+  gainXp(100 * mult);
   saveGameData();
 
   showYajuEndDialog({
@@ -904,6 +914,7 @@ function finishYajuNormal(win){
 
   if(win){
     playYajuAudio('se-clear', 1.0);
+    gainXp(50);
     if(yajuState.currentFloor < YAJU_CONFIG.maxFloors){
       showYajuEndDialog({
         eyebrow: 'YAJUMAZE',
@@ -921,7 +932,7 @@ function finishYajuNormal(win){
         ]
       });
     } else {
-      const earned = YAJU_REWARDS.MAZE_CLEAR_COINS;
+      const earned = YAJU_REWARDS.MAZE_CLEAR_COINS * (state.beastGodActive ? 2 : 1);
       state.yajuCoins = (state.yajuCoins || 0) + earned;
       saveGameData();
 
@@ -1040,6 +1051,7 @@ function moveYajuPlayer(dt){
   }
 
   if(yajuState.isSlowed) currentSpeed /= 2.0;
+  if(state.speedBuffTimer > 0) currentSpeed *= 1.5;
 
   if(yajuState.subMode === 'normal'){
     const sFill = el('yajuStaminaFill');
@@ -1049,8 +1061,9 @@ function moveYajuPlayer(dt){
   } else {
     const hFill = el('yajuHpFill');
     const hText = el('yajuHpText');
-    if(hFill) hFill.style.width = `${(yajuState.playerHp / YAJU_CONFIG.playerMaxHp) * 100}%`;
-    if(hText) hText.textContent = `${Math.ceil(yajuState.playerHp)} / ${YAJU_CONFIG.playerMaxHp}`;
+    const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
+    if(hFill) hFill.style.width = `${(yajuState.playerHp / maxHp) * 100}%`;
+    if(hText) hText.textContent = `${Math.ceil(yajuState.playerHp)} / ${maxHp}`;
   }
 
   const s = Math.sin(state.yaw);
@@ -1197,7 +1210,7 @@ function moveYajuEnemies(dt){
           eObj.attackCooldown = Math.max(0, (eObj.attackCooldown || 0) - dt);
           if(eObj.attackCooldown <= 0){
             eObj.attackCooldown = 1.5;
-            const dmg = 4 * atkMult;
+            const dmg = 12 * atkMult;
             damagePlayer(dmg, `World Enemyに触れてダメージを受けた！(-${dmg} HP)`);
             if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
           }
@@ -1233,7 +1246,7 @@ function moveYajuEnemies(dt){
       if(eObj.bossDashActive){
         if(len < 3.0 && !eObj.hasDamagedThisDash){
           eObj.hasDamagedThisDash = true;
-          const dmg = 5 * atkMult;
+          const dmg = 15 * atkMult;
           damagePlayer(dmg, `獣王の突進を喰らった！(-${dmg} HP)`);
           if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
         }
@@ -1244,7 +1257,7 @@ function moveYajuEnemies(dt){
       eObj.attackCooldown = Math.max(0, eObj.attackCooldown - dt);
       if(len < YAJU_CONFIG.enemyCatchDistance && eObj.attackCooldown <= 0){
         eObj.attackCooldown = 1.5;
-        const dmg = 4 * atkMult;
+        const dmg = 12 * atkMult;
         damagePlayer(dmg, `獣王の攻撃を受けた！(-${dmg} HP)`);
         if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
       }
@@ -1316,12 +1329,13 @@ function moveYajuEnemies(dt){
           eObj.planeMesh.material = createEnemyMaterial(enemyTextureBoom);
         }
         playYajuAudio('se-boom', 1.0);
+        gainXp(20);
         showYajuMessage('突進撃破！！');
       } else if(eObj.isBossMinion || yajuState.subMode.startsWith('boss')){
         eObj.attackCooldown = (eObj.attackCooldown || 0) - dt;
         if(eObj.attackCooldown <= 0){
           eObj.attackCooldown = 2.0;
-          const dmg = 4 * atkMult;
+          const dmg = 12 * atkMult;
           damagePlayer(dmg, `追跡者にダメージを受けた！(-${dmg} HP)`);
           if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
         }
@@ -1356,7 +1370,7 @@ function updateYajuProjectiles(dt){
         yajuState.projectiles.splice(i, 1);
         if(!yajuState.isDashing){
           playYajuAudio('se-boom', 0.8);
-          const dmg = 4 * atkMult;
+          const dmg = 12 * atkMult;
           damagePlayer(dmg, `World Enemyの青色弾頭に被弾！(-${dmg} HP)`);
           if(yajuState.isTransitioningToDeadStage || yajuState.subMode === 'deadstage') return;
         }
@@ -1399,6 +1413,7 @@ function updateYajuProjectiles(dt){
               eObj.planeMesh.material = createEnemyMaterial(enemyTextureBoom);
             }
             playYajuAudio('se-boom', 1.0);
+            gainXp(20);
             state.scene.remove(p.mesh);
             yajuState.projectiles.splice(i, 1);
             break;

@@ -2,6 +2,7 @@ import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
 import { state, getEquippedSkin, getDifficultyById } from './state.js';
 import { $, showToast, setModeUI, hud } from './ui.js';
+import { playSfx } from './sfx.js';
 import { spawn } from './map-fall-missile.js';
 import { applyEnemyDamage, burst, getMaxWaves } from './enemies.js';
 import { createAirStrikePlayerActor, finalizeAirStrikeResult, generateAirStrikeMissionData } from './mode-air-strike.js';
@@ -343,25 +344,14 @@ function formatChatTimestamp(date = new Date()){
 
 function setChatUnread(unread){
   const dot = $('#chatUnreadDot');
-  if(!dot) return;
-  if(unread && !chatExpanded){
-    dot.classList.remove('hidden');
-  } else {
-    dot.classList.add('hidden');
-  }
+  const appDot = $('#pdaAppChatDot');
+  const show = !!(unread && !chatExpanded);
+  if(dot) dot.classList.toggle('hidden', !show);
+  if(appDot) appDot.classList.toggle('hidden', !show);
 }
 
 export function expandChat(){
   chatExpanded = true;
-  const wrap = $('#globalChatWrap');
-  const toggleBtn = $('#chatToggleBtn');
-  const panel = $('#chatPanel');
-  if(wrap){
-    wrap.classList.remove('chat-collapsed');
-    wrap.classList.add('chat-expanded');
-  }
-  if(toggleBtn) toggleBtn.classList.add('hidden');
-  if(panel) panel.classList.remove('hidden');
   setChatUnread(false);
 
   const list = $('#chatMessages');
@@ -370,15 +360,6 @@ export function expandChat(){
 
 export function collapseChat(){
   chatExpanded = false;
-  const wrap = $('#globalChatWrap');
-  const toggleBtn = $('#chatToggleBtn');
-  const panel = $('#chatPanel');
-  if(wrap){
-    wrap.classList.add('chat-collapsed');
-    wrap.classList.remove('chat-expanded');
-  }
-  if(panel) panel.classList.add('hidden');
-  if(toggleBtn) toggleBtn.classList.remove('hidden');
 }
 
 function updateChatEmptyHint(){
@@ -920,6 +901,7 @@ function setupCoopDataHandlers(connection){
       }
       showToast(`${data.username} が共闘ルームに参加しました！`);
     } else if(data.type === 'pos'){
+      coopState.remotePos.loc = data.loc || 'home';
       coopState.remotePos.x = data.x;
       coopState.remotePos.y = data.y || 0;
       coopState.remotePos.z = data.z;

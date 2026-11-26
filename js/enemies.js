@@ -1,7 +1,8 @@
 import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
-import { state, getEquippedSkin, getEffectiveStats } from './state.js';
+import { state, getEquippedSkin, getEffectiveStats, gainXp } from './state.js';
 import { hud, announce } from './ui.js';
+import { playSfx } from './sfx.js';
 import { spawn } from './map-fall-missile.js';
 
 export function getMaxWaves(){
@@ -85,7 +86,9 @@ export function applyEnemyDamage(enemyObj, dmg, beamColor, scoreMult, coopCtx = 
   if(strongWhiteFx) burstWhiteStrong(enemyObj.position);
   else burst(enemyObj.position, beamColor);
 
+  if(enemyObj.userData.hp > 0) playSfx('enemy_hit', 0.55);
   if(enemyObj.userData.hp <= 0){
+    playSfx('enemy_destroy', 0.7);
     const idx = state.enemies.indexOf(enemyObj);
     if(idx >= 0){
       if(strongWhiteFx) burstWhiteStrong(enemyObj.position);
@@ -95,6 +98,7 @@ export function applyEnemyDamage(enemyObj, dmg, beamColor, scoreMult, coopCtx = 
       const pts = Math.round(basePts * scoreMult);
       state.score += pts;
       state.earnedGoldInMatch += pts;
+      gainXp(enemyObj.userData.kind === 'fighter' ? 50 : 10);
 
       const eid = enemyObj.userData.id;
       state.scene.remove(enemyObj);

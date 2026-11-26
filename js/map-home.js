@@ -147,7 +147,8 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
   // 全ポータルを壁際（壁内面±20.5にゲートがギリギリ接する位置・正面は壁と平行）に配置
   const battlePortal = createPortal('出撃ゲート', 'モード・難易度を選択して出撃', 0x00f5d4, -4.6, -20.3, 0);
   const yajuPortal = createPortal('YAJUMAZE', '迷路脱出＆ボス挑戦', 0xff4d6d, 4.6, -20.3, 0);
-  const skinPortal = createPortal('機体格納庫', '機体選択・強化へ', 0xff9233, 20.3, 0, -Math.PI / 2);
+  const skinPortal = createPortal('機体格納庫', '機体選択・強化へ', 0xff9233, 20.3, -4.2, -Math.PI / 2);
+  const testPortal = createPortal('テストルーム', '試し撃ち・スキル練習', 0xa8ff60, 20.3, 4.2, -Math.PI / 2);
   const coopPortal = createPortal('フレンド共闘', 'ルーム作成・参加で2人共闘', 0x38c8f0, -20.3, 0, Math.PI / 2, true);
   const storePortal = createPortal('ストア', 'アイテム・機体購入ショップ', 0xffd23f, 0, 20.3, Math.PI);
 
@@ -159,6 +160,7 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
       skinPortal.curtain.material.opacity = 0.2 + Math.cos(tick * 0.06) * 0.08;
       coopPortal.curtain.material.opacity = 0.2 + Math.sin(tick * 0.06 + 1.2) * 0.08;
       storePortal.curtain.material.opacity = 0.2 + Math.cos(tick * 0.06 + 0.8) * 0.08;
+      testPortal.curtain.material.opacity = 0.2 + Math.sin(tick * 0.06 + 1.8) * 0.08;
     },
     checkPortal(px, pz){
       if(Math.hypot(px - battlePortal.x, pz - battlePortal.z) < battlePortal.radius) return 'battle';
@@ -166,6 +168,7 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
       if(Math.hypot(px - skinPortal.x, pz - skinPortal.z) < skinPortal.radius) return 'skin';
       if(Math.hypot(px - coopPortal.x, pz - coopPortal.z) < coopPortal.radius) return 'coop';
       if(Math.hypot(px - storePortal.x, pz - storePortal.z) < storePortal.radius) return 'store';
+      if(Math.hypot(px - testPortal.x, pz - testPortal.z) < testPortal.radius) return 'test';
       return null;
     }
   };

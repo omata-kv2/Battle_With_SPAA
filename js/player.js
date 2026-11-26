@@ -9,10 +9,11 @@ import { applyEnemyDamage, burst, burstWhiteStrong } from './enemies.js';
 import { getYajuTargetMeshes, applyYajuPlayerDamage } from './mode-yaju-maze.js';
 
 function isCombatActiveMode(){
-  return state.gameMode === 'battle' && (state.activeBattleMode === 'FALL_MISSILE' || state.activeBattleMode === 'YAJU_BOSS');
+  return state.gameMode === 'test' || (state.gameMode === 'battle' && (state.activeBattleMode === 'FALL_MISSILE' || state.activeBattleMode === 'YAJU_BOSS'));
 }
 
 function getCombatEnemies(){
+  if(state.gameMode === 'test') return (state.testController && state.testController.dummyMesh) ? [state.testController.dummyMesh] : [];
   return state.activeBattleMode === 'YAJU_BOSS' ? getYajuTargetMeshes() : state.enemies;
 }
 
@@ -424,7 +425,17 @@ function triggerLaserTurretAttack(mkNumber, coopCtx = {}){
   updateLaserAttackButtonState(mkNumber, 'active', lt.activeTimer);
 }
 
-function dealHitToEnemy(enemyObj, dmg, beamColor, scoreMult, coopCtx, strongWhiteFx = false){
+function dealHitToEnemy(enemyObj, rawDmg, beamColor, scoreMult, coopCtx, strongWhiteFx = false){
+  const dmg = (state.powerBuffTimer > 0) ? rawDmg * 2 : rawDmg;
+  if(state.gameMode === 'test'){
+    const hitPos = getTargetWorldPos(enemyObj);
+    if(strongWhiteFx) burstWhiteStrong(hitPos);
+    else burst(hitPos, beamColor);
+    if(!Array.isArray(state.testDpsHistory)) state.testDpsHistory = [];
+    state.testDpsHistory.push({ t: performance.now(), dmg });
+    if(state.testController && state.testController.onDummyHit) state.testController.onDummyHit(dmg);
+    return;
+  }
   if(state.activeBattleMode === 'YAJU_BOSS'){
     const hitPos = getTargetWorldPos(enemyObj);
     if(strongWhiteFx) burstWhiteStrong(hitPos);

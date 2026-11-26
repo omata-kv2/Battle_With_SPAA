@@ -146,8 +146,8 @@ export const SHOP_ITEMS = [
     id: "emp_shield",
     name: "電磁防御システム",
     shortName: "電磁防御",
-    price: 1000,
-    currency: "gold",
+    price: 10000,
+    currency: "yaju",
     color: "#38c8f0",
     desc: "YAJU系では8秒間無敵付与、FallMissileでは敵の動きを7秒間停止（電磁エフェクト付）。"
   },
@@ -155,7 +155,7 @@ export const SHOP_ITEMS = [
     id: "hydrogen_bomb",
     name: "水素爆弾",
     shortName: "水素爆弾",
-    price: 1000,
+    price: 100000,
     currency: "gold",
     color: "#7ef9e8",
     desc: "青白く3秒かけてフェードアウトし、敵を7秒間停止＆敵全体に1000ダメージ。"
@@ -164,9 +164,54 @@ export const SHOP_ITEMS = [
     id: "yaju_nuke",
     name: "野獣型原子爆弾",
     shortName: "野獣原爆",
-    price: 1000,
+    price: 81000,
     currency: "yaju",
     color: "#ff9ebb",
     desc: "YAJUコインで購入可能。青白く3秒フェードアウトし、敵を7秒間停止＆1000ダメージ。"
+  },
+  {
+    id: "hp_full",
+    name: "HP完全回復ストーン",
+    shortName: "全回復石",
+    price: 15000,
+    currency: "gold",
+    color: "#4de680",
+    desc: "HP（またはPEACE）を最大値まで完全回復する。"
+  },
+  {
+    id: "hp_half",
+    name: "HP半分回復ストーン",
+    shortName: "半回復石",
+    price: 10000,
+    currency: "gold",
+    color: "#9be8ff",
+    desc: "HP（またはPEACE）を最大値の半分ぶん回復する。"
+  },
+  {
+    id: "power_double",
+    name: "火力2倍ストーン",
+    shortName: "火力2倍",
+    price: 20000,
+    currency: "gold",
+    color: "#ff9233",
+    desc: "10秒間、すべての攻撃の与ダメージが2倍になる。"
+  },
+  {
+    id: "speed_up",
+    name: "移動速度上昇ストーン",
+    shortName: "速度上昇",
+    price: 12000,
+    currency: "gold",
+    color: "#ffd23f",
+    desc: "10秒間、プレイヤーの移動速度が1.5倍になる。"
+  },
+  {
+    id: "beast_god_stone",
+    name: "獣神化パワーストーン",
+    shortName: "獣神化石",
+    price: 5000,
+    currency: "yaju",
+    color: "#c77dff",
+    desc: "YAJUコイン限定。使用した試合の報酬（Gold・YAJUコイン・XP）獲得数が2倍（制限時間なし）。"
   }
 ];

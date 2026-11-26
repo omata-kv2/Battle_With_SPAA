@@ -79,7 +79,7 @@ export function initInputControls(getCoopCtx){
   installTouchSelectionGuards();
 
   const handleFirePressStart = () => {
-    if(state.gameMode !== 'battle' || (state.activeBattleMode !== 'FALL_MISSILE' && state.activeBattleMode !== 'YAJU_BOSS') || state.modalOpen) return;
+    if((state.gameMode !== 'test' && (state.gameMode !== 'battle' || (state.activeBattleMode !== 'FALL_MISSILE' && state.activeBattleMode !== 'YAJU_BOSS'))) || state.modalOpen) return;
     combatState.fireHeld = true;
     combatState.autoFireTimer = 0;
     shoot(getCoopCtx());

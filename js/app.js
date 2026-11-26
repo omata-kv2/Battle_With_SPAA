@@ -1,19 +1,22 @@
 import * as T from './libs/three.module.js';
 import { CONFIG } from './config.js';
-import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData, resetMatchInventoryUsage } from './state.js';
+import { state, getEquippedSkin, getDifficultyById, loadGameData, saveGameData, resetMatchInventoryUsage, addFriendByCode, importSaveCode, onPlayerLevelUp } from './state.js';
 import {
   $, progress, loading, loadError, hideStartScreen, showEndScreen, hideEndScreen,
-  setModeUI, showToast, updateHoldGauge, resetWhiteFade, initInventoryBar, updateInventoryBar
+  setModeUI, showToast, updateHoldGauge, resetWhiteFade, initInventoryBar, updateInventoryBar, updatePlayerPlate, updateTestDpsUI
 } from './ui.js';
 import { initInputControls, resetMovementInputs } from './controls.js';
 import {
   closeAllModals, openCoopModal, openBattleSetupModal, renderBattleSetupModal,
   openSkinSelectModal, confirmSkinSelection, openUpgradeModal, openSkinStoreModal,
-  openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal, switchStoreTab
+  openYajuSetupModal, openYajuBossSetupModal, openYajuIpadWarnModal, switchStoreTab,
+  openTransferChoiceModal, openTransferImportModal, renderCoopFriendsList
 } from './modals.js';
-import { resetCombatState, updateCombatSystem } from './player.js';
+import { resetCombatState, updateCombatSystem, initLaserTurretDeployState } from './player.js';
 import { useInventoryItem } from './items.js';
-import { initPdaEvents } from './pda.js';
+import { initGlobalSfx, playSfx } from './sfx.js';
+import { initPdaEvents, bindPdaCallbacks } from './pda.js';
+import { buildTestRoomWorld } from './map-test.js';
 import { clearEnemiesAndFx, updateEnemiesAndWave } from './enemies.js';
 import { initFallMissileMode, updateFallMissileMode } from './mode-fall-missile.js';
 import { initAirStrikeMode, updateAirStrikeMode, generateAirStrikeMissionData } from './mode-air-strike.js';
@@ -25,7 +28,7 @@ import {
   coopState, bindMultiplayerCallbacks, resetCoopMatchFlags, sendCoop, getCoopContext,
   initiateCoopBattleRequest, cancelOutgoingBattleInvite, respondToBattleInvite,
   clearRemoteVisuals, createRemotePlayerMesh, initRemoteAirStrikeCraft,
-  syncCoopFrame, ensureLobbyInitialized, expandChat, collapseChat,
+  syncCoopFrame, ensureLobbyInitialized,
   sendGlobalChatMessage, publishCoopRecruit, cancelMyCoopRecruit,
   leaveCoopRoom, createCoopRoom, joinCoopRoom
 } from './multiplayer.js';
@@ -48,6 +51,7 @@ function clearScene(){
   state.target = null;
   state.homeController = null;
   state.skinController = null;
+  state.testController = null;
   state.airStrikeState = null;
   clearRemoteVisuals();
 }
@@ -85,6 +89,10 @@ export function enterHome(){
   state.pitch = -0.05;
   state.triggerCooldown = 35;
   state.panelHoldTime = 0;
+  state.portalHoldTime = 0;
+  state.portalHoldTarget = null;
+  state.testDpsHistory = [];
+  updateTestDpsUI(0);
   updateHoldGauge(0);
 
   clearScene();
@@ -96,6 +104,34 @@ export function enterHome(){
 
   setModeUI('home', getEquippedSkin(), coopState.isCoop, coopState.isHost);
   ensureLobbyInitialized();
+}
+
+export function enterTestRoom(){
+  resetMovementInputs();
+  resetWhiteFade();
+  hideEndScreen();
+  closeAllModals();
+  state.gameMode = 'test';
+  state.x = 0;
+  state.y = 0;
+  state.z = 8;
+  state.yaw = 0;
+  state.pitch = -0.04;
+  state.triggerCooldown = 35;
+  state.panelHoldTime = 0;
+  state.portalHoldTime = 0;
+  state.portalHoldTarget = null;
+  state.testDpsHistory = [];
+  updateTestDpsUI(0);
+  updateHoldGauge(0);
+
+  clearScene();
+  state.testController = buildTestRoomWorld(T, state.scene);
+  const eqSkin = getEquippedSkin();
+  setModeUI('test', eqSkin, coopState.isCoop, coopState.isHost);
+  if(eqSkin.attackType === 'laser'){
+    initLaserTurretDeployState(state.skinUpgrades[eqSkin.id]?.laserTurretCount || 1);
+  }
 }
 
 export function enterSkinRoom(){
@@ -111,6 +147,10 @@ export function enterSkinRoom(){
   state.pitch = -0.04;
   state.triggerCooldown = 35;
   state.panelHoldTime = 0;
+  state.portalHoldTime = 0;
+  state.portalHoldTarget = null;
+  state.testDpsHistory = [];
+  updateTestDpsUI(0);
   updateHoldGauge(0);
 
   clearScene();
@@ -135,6 +175,9 @@ export function startBattle(mode = 'FALL_MISSILE', diffId = 'easy', missionData 
   state.tick = 0;
   state.wait = 0;
   state.panelHoldTime = 0;
+  state.portalHoldTime = 0;
+  state.portalHoldTarget = null;
+  state.testDpsHistory = [];
   state.triggerCooldown = 0;
   updateHoldGauge(0);
   resetMatchInventoryUsage();
@@ -170,7 +213,9 @@ export function finishBattle(win){
   clearEnemiesAndFx();
   resetCombatState();
   state.gameMode = 'end';
-  state.gold += state.earnedGoldInMatch;
+  const finalGoldEarned = state.beastGodActive ? state.earnedGoldInMatch * 2 : state.earnedGoldInMatch;
+  state.earnedGoldInMatch = finalGoldEarned;
+  state.gold += finalGoldEarned;
   saveGameData();
 
   const effectiveCtx = getCoopContext();
@@ -187,6 +232,7 @@ export function finishBattle(win){
   coopState.battleSoloOverride = false;
   resetCoopMatchFlags();
 
+  if(win) playSfx('spaa_clear', 0.85);
   showEndScreen(win, state.score, state.earnedGoldInMatch, effectiveCtx.isCoop, detail);
 }
 
@@ -200,6 +246,10 @@ bindMultiplayerCallbacks({
 bindYajuCallbacks({
   enterHome,
   openBossSetup: openYajuBossSetupModal
+});
+
+bindPdaCallbacks({
+  enterTestRoom
 });
 
 async function resolveGLTFLoaderClass(){
@@ -292,6 +342,8 @@ async function init(){
     initInputControls(getCoopContext);
     initInventoryBar((itemId) => useInventoryItem(itemId, getCoopContext()));
     initPdaEvents();
+    initGlobalSfx();
+    onPlayerLevelUp((lvUp) => updatePlayerPlate(lvUp));
 
     progress(15, '3Dレンダラー初期化中...');
     state.renderer = new T.WebGLRenderer({ canvas: $('#scene'), antialias: true, powerPreference: 'high-performance' });
@@ -320,8 +372,7 @@ async function init(){
     }
 
     if(!state.username){
-      state.modalOpen = true;
-      $('#usernameModal').classList.add('visible');
+      openTransferChoiceModal();
     } else {
       enterHome();
     }
@@ -333,9 +384,10 @@ async function init(){
 
 function moveAndCam(dt){
   const skin = getEquippedSkin();
-  const baseSpd = state.gameMode === 'battle'
+  let baseSpd = (state.gameMode === 'battle' || state.gameMode === 'test')
     ? CONFIG.MOVE_SPEED * (skin.stats.moveMult || 1.0)
     : CONFIG.HOME_MOVE_SPEED;
+  if(state.speedBuffTimer > 0) baseSpd *= 1.5;
   const spd = baseSpd * (dt * 60);
 
   const mx = (state.keys.KeyD || state.keys.ArrowRight ? 1 : 0) - (state.keys.KeyA || state.keys.ArrowLeft ? 1 : 0) + state.move.x;
@@ -345,7 +397,7 @@ function moveAndCam(dt){
   state.x += (mx * c + mz * s) * spd;
   state.z += (mz * c - mx * s) * spd;
 
-  const limit = state.gameMode === 'home' ? 19.0 : (state.gameMode === 'skin' ? 17.0 : 16.0);
+  const limit = state.gameMode === 'home' ? 19.0 : ((state.gameMode === 'skin' || state.gameMode === 'test') ? 17.0 : 16.0);
   state.x = T.MathUtils.clamp(state.x, -limit, limit);
   state.z = T.MathUtils.clamp(state.z, -limit, limit);
 
@@ -354,7 +406,7 @@ function moveAndCam(dt){
     state.camera.rotation.order = 'YXZ';
     state.camera.rotation.y = state.yaw;
     state.camera.rotation.x = state.pitch;
-  } else if(state.gameMode === 'skin'){
+  } else if(state.gameMode === 'skin' || state.gameMode === 'test'){
     state.camera.position.set(state.x, 1.65, state.z);
     state.camera.rotation.order = 'YXZ';
     state.camera.rotation.y = state.yaw;
@@ -375,7 +427,9 @@ function loop(now){
   state.lastFrameTime = now;
   state.syncTick++;
 
-  if(!state.modalOpen && (state.gameMode === 'home' || state.gameMode === 'skin' || (state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'))){
+  if(state.powerBuffTimer > 0) state.powerBuffTimer = Math.max(0, state.powerBuffTimer - dt);
+  if(state.speedBuffTimer > 0) state.speedBuffTimer = Math.max(0, state.speedBuffTimer - dt);
+  if(!state.modalOpen && (state.gameMode === 'home' || state.gameMode === 'skin' || state.gameMode === 'test' || (state.gameMode === 'battle' && state.activeBattleMode === 'FALL_MISSILE'))){
     moveAndCam(dt);
   }
 
@@ -385,43 +439,120 @@ function loop(now){
     state.homeController.update(state.syncTick);
     if(state.triggerCooldown > 0){
       state.triggerCooldown--;
+      state.portalHoldTime = 0;
+      state.portalHoldTarget = null;
     } else if(!state.modalOpen){
       const hit = state.homeController.checkPortal(state.x, state.z);
-      if(hit === 'battle'){
-        state.triggerCooldown = 45;
-        openBattleSetupModal();
-      } else if(hit === 'yaju'){
-        state.triggerCooldown = 45;
-        openYajuSetupModal();
-      } else if(hit === 'skin'){
-        enterSkinRoom();
-      } else if(hit === 'coop'){
-        state.triggerCooldown = 45;
-        openCoopModal();
-      } else if(hit === 'store'){
-        state.triggerCooldown = 45;
-        openSkinStoreModal('items');
+      if(hit){
+        if(state.portalHoldTarget !== hit){
+          state.portalHoldTarget = hit;
+          state.portalHoldTime = 0;
+        }
+        state.portalHoldTime += dt;
+        if(state.portalHoldTime >= 0.5){
+          state.portalHoldTime = 0;
+          state.portalHoldTarget = null;
+          if(hit === 'battle'){
+            playSfx('portal', 0.75);
+            state.triggerCooldown = 45;
+            openBattleSetupModal();
+          } else if(hit === 'yaju'){
+            playSfx('portal', 0.75);
+            state.triggerCooldown = 45;
+            openYajuSetupModal();
+          } else if(hit === 'skin'){
+            playSfx('portal', 0.75);
+            enterSkinRoom();
+          } else if(hit === 'test'){
+            playSfx('portal', 0.75);
+            enterTestRoom();
+          } else if(hit === 'coop'){
+            playSfx('portal', 0.75);
+            state.triggerCooldown = 45;
+            openCoopModal();
+          } else if(hit === 'store'){
+            playSfx('portal', 0.75);
+            state.triggerCooldown = 45;
+            openSkinStoreModal('items');
+          }
+        }
+      } else {
+        state.portalHoldTime = 0;
+        state.portalHoldTarget = null;
       }
     }
   } else if(state.gameMode === 'skin' && state.skinController){
     state.skinController.update(state.syncTick);
     if(state.triggerCooldown > 0){
       state.triggerCooldown--;
+      state.panelHoldTime = 0;
+      state.portalHoldTime = 0;
+      state.portalHoldTarget = null;
+      updateHoldGauge(0);
     } else if(!state.modalOpen){
       const zone = state.skinController.checkZone(state.x, state.z);
       if(zone === 'backHome'){
-        enterHome();
+        state.panelHoldTime = 0;
+        updateHoldGauge(0);
+        if(state.portalHoldTarget !== 'skin_backHome'){
+          state.portalHoldTarget = 'skin_backHome';
+          state.portalHoldTime = 0;
+        }
+        state.portalHoldTime += dt;
+        if(state.portalHoldTime >= 0.5){
+          state.portalHoldTime = 0;
+          state.portalHoldTarget = null;
+          enterHome();
+        }
       } else if(zone === 'selectPanel'){
+        state.portalHoldTime = 0;
+        state.portalHoldTarget = null;
         state.panelHoldTime += dt;
-        updateHoldGauge(state.panelHoldTime / 2.0);
-        if(state.panelHoldTime >= 2.0){
+        updateHoldGauge(state.panelHoldTime / 0.5);
+        if(state.panelHoldTime >= 0.5){
           state.panelHoldTime = 0;
           updateHoldGauge(0);
           openSkinSelectModal();
         }
       } else {
         state.panelHoldTime = 0;
+        state.portalHoldTime = 0;
+        state.portalHoldTarget = null;
         updateHoldGauge(0);
+      }
+    }
+  } else if(state.gameMode === 'test' && state.testController){
+    state.testController.update(dt, state.syncTick);
+    updateCombatSystem(dt, {});
+    const dpsNow = performance.now();
+    if(!Array.isArray(state.testDpsHistory)) state.testDpsHistory = [];
+    const cutoff = dpsNow - 1000;
+    while(state.testDpsHistory.length > 0 && state.testDpsHistory[0].t < cutoff){
+      state.testDpsHistory.shift();
+    }
+    let dpsSum = 0;
+    for(const item of state.testDpsHistory) dpsSum += item.dmg;
+    updateTestDpsUI(dpsSum);
+    if(state.triggerCooldown > 0){
+      state.triggerCooldown--;
+      state.portalHoldTime = 0;
+      state.portalHoldTarget = null;
+    } else if(!state.modalOpen){
+      const zone = state.testController.checkZone(state.x, state.z);
+      if(zone === 'backHome'){
+        if(state.portalHoldTarget !== 'test_backHome'){
+          state.portalHoldTarget = 'test_backHome';
+          state.portalHoldTime = 0;
+        }
+        state.portalHoldTime += dt;
+        if(state.portalHoldTime >= 0.5){
+          state.portalHoldTime = 0;
+          state.portalHoldTarget = null;
+          enterHome();
+        }
+      } else {
+        state.portalHoldTime = 0;
+        state.portalHoldTarget = null;
       }
     }
   } else if(state.gameMode === 'battle'){
@@ -632,17 +763,7 @@ $('#closeCoopBtn')?.addEventListener('pointerdown', (e) => {
   state.triggerCooldown = 45;
 });
 
-// 全体チャットUI
-$('#chatToggleBtn')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  expandChat();
-});
-$('#chatMinimizeBtn')?.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  collapseChat();
-});
+// 全体チャットUI（情報機器内に統合）
 $('#chatSendBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -716,4 +837,46 @@ $('#tabItemShopBtn')?.addEventListener('pointerdown', (e) => {
 $('#tabUnitShopBtn')?.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   switchStoreTab('units');
+});
+
+// 初回引き継ぎフロー & フレンド追加イベント
+$('#openTransferImportBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  openTransferImportModal();
+});
+$('#startNewPlayerBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  closeAllModals();
+  state.modalOpen = true;
+  $('#usernameModal')?.classList.add('visible');
+});
+$('#backTransferChoiceBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  openTransferChoiceModal();
+});
+$('#confirmTransferImportBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const raw = $('#transferImportInput')?.value || '';
+  const res = importSaveCode(raw);
+  const msgEl = $('#transferImportMsg');
+  if(!res.ok){
+    if(msgEl) msgEl.textContent = res.msg;
+    return;
+  }
+  closeAllModals();
+  showToast(res.msg);
+  enterHome();
+});
+
+$('#addFriendBtn')?.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const codeEl = $('#friendCodeInput');
+  const nameEl = $('#friendNameInput');
+  const res = addFriendByCode(codeEl ? codeEl.value : '', nameEl ? nameEl.value : '');
+  showToast(res.msg);
+  if(res.ok){
+    if(codeEl) codeEl.value = '';
+    if(nameEl) nameEl.value = '';
+    renderCoopFriendsList();
+  }
 });

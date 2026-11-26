@@ -2,6 +2,7 @@ import { CONFIG, SHOP_ITEMS } from './config.js';
 import { YAJU_BOSSES, YAJU_BOSS_DIFFICULTIES, YAJU_REWARDS } from './yaju-config.js';
 import { state, getSkinUpgrade, getEquippedSkin, getEffectiveStats, getDifficultyById, saveGameData } from './state.js';
 import { $, setModeUI, updateHoldGauge } from './ui.js';
+import { playSfx } from './sfx.js';
 import { resetMovementInputs } from './controls.js';
 import { coopState, hasActiveRecruit } from './multiplayer.js';
 
@@ -21,12 +22,16 @@ export function closeAllModals(){
     '#yajuSetupModal',
     '#yajuBossSetupModal',
     '#yajuIpadWarnModal',
-    '#pdaModal'
+    '#pdaModal',
+    '#gachaRatesModal',
+    '#transferChoiceModal',
+    '#transferImportModal'
   ];
   modals.forEach(id => {
     const el = $(id);
     if(el) el.classList.remove('visible');
   });
+  $('#gachaScreen')?.classList.add('hidden');
 }
 
 export function openCoopWaitModal(mode, diffId){
@@ -76,6 +81,8 @@ export function closeCoopInviteModal(){
 
 export function openCoopModal(){
   resetMovementInputs();
+  renderCoopFriendsList();
+  renderCoopFriendsList();
   state.modalOpen = true;
   const leaveBtn = $('#leaveCoopRoomBtn');
   if(leaveBtn) leaveBtn.style.display = (coopState.isCoop || coopState.coopRoomCode) ? 'block' : 'none';
@@ -223,6 +230,7 @@ export function renderSkinSelectList(){
     });
     container.appendChild(card);
   });
+  $('#gachaScreen')?.classList.add('hidden');
 }
 
 export function confirmSkinSelection(){
@@ -461,6 +469,7 @@ export function renderItemShopList(){
           state.inventory[item.id] = (state.inventory[item.id] || 0) + 1;
         }
       }
+      playSfx('purchase', 0.8);
       saveGameData();
       if(state.homeController && state.homeController.refreshCurrencyPanels){
         state.homeController.refreshCurrencyPanels(state.gold, state.yajuCoins);
@@ -469,6 +478,7 @@ export function renderItemShopList(){
     });
     container.appendChild(card);
   });
+  $('#gachaScreen')?.classList.add('hidden');
 }
 
 export function renderSkinStoreList(){
@@ -501,6 +511,7 @@ export function renderSkinStoreList(){
         if(state.gold >= skin.price && !state.unlockedSkins.includes(skin.id)){
           state.gold -= skin.price;
           state.unlockedSkins.push(skin.id);
+          playSfx('purchase', 0.8);
           saveGameData();
           if(state.skinController) state.skinController.refreshPedestals(state.unlockedSkins, state.selectedSkinId);
           if(state.homeController && state.homeController.refreshCurrencyPanels){
@@ -512,6 +523,7 @@ export function renderSkinStoreList(){
     }
     container.appendChild(card);
   });
+  $('#gachaScreen')?.classList.add('hidden');
 }
 
 export function getSelectedDiffObj(){
@@ -605,3 +617,38 @@ export function openYajuIpadWarnModal(){
   state.modalOpen = true;
   $('#yajuIpadWarnModal')?.classList.add('visible');
 }
+
+export function openTransferChoiceModal(){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  $('#transferChoiceModal')?.classList.add('visible');
+}
+
+export function openTransferImportModal(){
+  resetMovementInputs();
+  closeAllModals();
+  state.modalOpen = true;
+  const msgEl = $('#transferImportMsg');
+  if(msgEl) msgEl.textContent = '';
+  $('#transferImportModal')?.classList.add('visible');
+}
+
+export function renderCoopFriendsList(){
+  const listEl = $('#coopFriendsList');
+  if(!listEl) return;
+  const friends = state.friends || [];
+  if(friends.length === 0){
+    listEl.innerHTML = '<div class="chat-empty-hint" style="padding:8px;">登録されたフレンドはいません</div>';
+    return;
+  }
+  listEl.innerHTML = friends.map(f => `
+    <div class="skin-card" style="padding:7px 10px;">
+      <div class="skin-info">
+        <div class="skin-title">${f.name}</div>
+        <div class="skin-desc">${f.code}</div>
+      </div>
+    </div>
+  `).join('');
+}
+

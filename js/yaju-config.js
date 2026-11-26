@@ -60,10 +60,10 @@ export const YAJU_BOSSES = [
 ];
 
 export const YAJU_BOSS_DIFFICULTIES = [
-  { id: 'easy', name: 'イージー', hp: 100, atkMult: 1.0 },
-  { id: 'normal', name: 'ノーマル', hp: 500, atkMult: 2.0 },
-  { id: 'hard', name: 'ハード', hp: 1000, atkMult: 3.0 },
-  { id: 'insane', name: 'INSANE', hp: 1919, atkMult: 4.0 }
+  { id: 'easy', name: 'イージー', hp: 500, atkMult: 1.0 },
+  { id: 'normal', name: 'ノーマル', hp: 2500, atkMult: 2.0 },
+  { id: 'hard', name: 'ハード', hp: 5000, atkMult: 3.0 },
+  { id: 'insane', name: 'INSANE', hp: 10000, atkMult: 4.0 }
 ];
 
 export const YAJU_REWARDS = {
