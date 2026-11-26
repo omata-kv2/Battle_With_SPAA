@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#071522">
+<title>Cooking With SPAA v5.6</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+window.__spaaShowBootError = function(msg){
+  var box = document.getElementById("bootErrorBanner");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "bootErrorBanner";
+    box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:rgba(140,12,24,0.95);color:#fff;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-all;border:1px solid #ff8899;pointer-events:auto;";
+    document.body ? document.body.appendChild(box) : document.addEventListener("DOMContentLoaded", function(){ document.body.appendChild(box); });
+  }
+  box.textContent = "起動エラー: " + msg;
+};
+window.addEventListener("error", function(e){
+  if(e && e.message) window.__spaaShowBootError(e.message + (e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : ""));
+});
+window.addEventListener("unhandledrejection", function(e){
+  if(e && e.reason) window.__spaaShowBootError(e.reason.message || String(e.reason));
+});
+</script>
+<script type="importmap">{"imports":{"three":"./js/libs/three.module.js","./js/utils/BufferGeometryUtils.js":"./js/libs/BufferGeometryUtils.js"}}</script>
+</head>
+<body>
+<div id="game" class="not-loaded">
+  <canvas id="scene"></canvas>
+  <div id="lookSurface" aria-label="視点操作エリア"></div>
+  <div id="hud">
+    <button type="button" id="pdaOpenBtn" class="pda-open-btn hidden" aria-label="情報機器を開く">
+      📱 情報機器
+      <span id="chatUnreadDot" class="chat-unread-dot hidden"></span>
+    </button>
+    <div id="testDpsHud" class="test-dps-hud hidden-mode" aria-label="テストルームDPS">
+      <span class="test-dps-label">DPS</span>
+      <b id="testDpsVal" class="test-dps-val">0</b>
+    </div>
+    <!-- プレイヤープレート（円形XPバー・レベル・名前・コード・機体名） -->
+    <div id="playerPlate" class="player-plate hidden-mode">
+      <div class="plate-xp-ring">
+        <svg viewBox="0 0 40 40">
+          <circle class="plate-ring-bg" cx="20" cy="20" r="16"></circle>
+          <circle id="plateXpCircle" class="plate-ring-fill" cx="20" cy="20" r="16" stroke-dasharray="0 100.5"></circle>
+        </svg>
+        <span id="plateLevelNum" class="plate-level-num">1</span>
+      </div>
+      <div class="plate-info">
+        <div id="plateName" class="plate-name">---</div>
+        <div id="plateCode" class="plate-code">SPAA------</div>
+        <div id="plateSkin" class="plate-skin">Origin</div>
+      </div>
+    </div>
+    <div id="toastBanner" class="hidden"></div>
+    
+    <div id="holdGaugeWrap" class="hidden">
+      <div class="hold-label">機体変更パネル起動中…</div>
+      <div class="hold-bar"><div id="holdGaugeFill"></div></div>
+    </div>
+
+    <header class="battle-only hidden-mode">
+      <div class="header-left">
+        <div class="logo">COOKING <i>WITH</i> SPAA</div>
+        <button id="abortBattleBtn" class="abort-btn" type="button">ホームへ戻る</button>
+      </div>
+      <div class="stats">
+        <span><em id="stat1Label">WAVE</em> <b id="wave">1 / 5</b></span>
+        <span><em id="stat2Label">TARGETS</em> <b id="remaining">0</b></span>
+        <span><em id="stat3Label">PEACE</em> <b id="peace">100%</b></span>
+      </div>
+    </header>
+    <div id="announce" class="battle-only hidden-mode">WORLD PEACE DEFENSE SYSTEM</div>
+    <div id="reticle" class="battle-only hidden-mode">+</div>
+
+    <!-- 汎用チャージゲージ（非Explosion用予備） -->
+    <div id="chargeGaugeWrap" class="hidden">
+      <div id="chargeLabel" class="charge-label">CHARGING…</div>
+      <div class="charge-bar"><div id="chargeGaugeFill"></div></div>
+    </div>
+
+    <!-- Explosion専用 画面右端中央チャージメーター（0.0s〜3.0s / 0.1刻み） -->
+    <div id="explosionChargeMeter" class="hidden" aria-label="Explosionチャージメーター">
+      <div class="exp-meter-readout" id="expMeterReadout">0.0s</div>
+      <div class="exp-meter-frame" id="expMeterFrame">
+        <div class="exp-meter-liquid" id="expMeterLiquid">
+          <div class="exp-meter-meniscus"></div>
+        </div>
+        <div class="exp-meter-ticks" id="expMeterTicks"></div>
+      </div>
+      <div class="exp-meter-radius" id="expMeterRadius">0.0m</div>
+    </div>
+    
+
+    <!-- YAJUMAZE / ボス戦用 HUD -->
+    <div id="yajuHud" class="hidden">
+      <img id="yajuRocketHud" src="./assets/items/rocket.png" class="hidden" alt="Rocket">
+      <div class="yaju-hud-top">
+        <div class="yaju-panel" id="yajuStaminaPanel">
+          <div class="yaju-hud-label">STAMINA</div>
+          <div class="yaju-meter"><div id="yajuStaminaFill"></div></div>
+          <div id="yajuStaminaText">20 / 20</div>
+        </div>
+        <div class="yaju-panel hidden" id="yajuHpPanel">
+          <div class="yaju-hud-label">PLAYER HP</div>
+          <div class="yaju-meter"><div id="yajuHpFill"></div></div>
+          <div id="yajuHpText">20 / 20</div>
+        </div>
+        <div class="yaju-panel yaju-status-panel">
+          <div class="yaju-hud-label">FLOOR / STATUS</div>
+          <div id="yajuFloorDisplay">1F</div>
+        </div>
+        <div class="yaju-top-right-slot">
+          <div class="yaju-compass-container" id="yajuCompassContainer">
+            <div class="yaju-compass-wrapper">
+              <div class="yaju-compass-label">EXIT</div>
+              <div class="yaju-compass-circle">
+                <div id="yajuExitNeedle" class="yaju-needle" style="background-color:#8aff9d;"></div>
+                <div id="yajuExitDistance" class="yaju-distance-text">0m</div>
+              </div>
+            </div>
+            <div class="yaju-compass-wrapper">
+              <div class="yaju-compass-label">YAJU</div>
+              <div class="yaju-compass-circle" id="yajuRadar"></div>
+            </div>
+          </div>
+          <div class="yaju-panel yaju-boss-hp-panel hidden" id="yajuBossHpPanel">
+            <div class="yaju-hud-label" id="yajuBossHpLabel">BOSS HP</div>
+            <div class="yaju-meter"><div id="yajuBossHpFill"></div></div>
+            <div id="yajuBossHpText">100 / 100</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="yajuMessage" class="yaju-message"></div>
+
+      <!-- 画面右端中央の小型丸型ロケット発射ボタン -->
+      <button type="button" id="yajuRocketBtn" class="yaju-rocket-btn hidden" aria-label="ロケット発射">
+        <span class="yaju-rocket-label">発射</span>
+        <span id="yajuRocketCount" class="yaju-rocket-count">0</span>
+      </button>
+
+      <div id="yajuControls" class="yaju-controls">
+        <div class="yaju-action-buttons">
+          <div id="yajuDashWrap" class="yaju-dash-wrapper">
+            <svg class="yaju-dash-cd-ring" viewBox="0 0 36 36">
+              <path class="yaju-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path id="yajuDashCdPath" class="yaju-ring-fill" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <button type="button" id="yajuDashBtn" class="yaju-btn-action yaju-btn-dash">突進</button>
+          </div>
+          <button type="button" id="yajuSprintBtn" class="yaju-btn-action yaju-btn-sprint">走る</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- 画面右端 3連結アイテムインベントリ（全ゲームモード共通） -->
+    <div id="itemInventoryBar" class="item-inv-bar hidden" aria-label="アイテムインベントリ">
+      <button type="button" class="inv-slot inv-empty" data-slot="0" id="invSlot_0">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+      <button type="button" class="inv-slot inv-empty" data-slot="1" id="invSlot_1">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+      <button type="button" class="inv-slot inv-empty" data-slot="2" id="invSlot_2">
+        <span class="inv-name">空</span>
+        <span class="inv-count hidden">0</span>
+      </button>
+    </div>
+    <div id="yajuEmpOverlay" class="yaju-emp-overlay hidden"></div>
+
+    <div id="controls">
+      <div id="stick" aria-label="移動スティック"><div id="stickKnob"></div></div>
+      <div class="right-controls battle-only hidden-mode" id="fireWrap">
+        <button id="skillBtn" class="skill-btn" type="button">
+          <span id="skillBtnName" class="skill-btn-name">SKILL</span>
+          <span id="skillBtnSub" class="skill-btn-sub">READY</span>
+        </button>
+        <div id="laserAttackStack" class="laser-attack-stack hidden"></div>
+        <button id="fire" type="button">PULSE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- クリア時2秒ホワイトアウト用オーバーレイ -->
+<div id="whiteFadeOverlay"></div>
+<div id="blueWhiteFadeOverlay"></div>
+
+<!-- スタート画面 -->
+<div id="startOverlay" class="visible">
+  <div class="start-center-box">
+    <div class="eyebrow">WORLD PEACE DEFENSE PROJECT</div>
+    <h1>COOKING<br>WITH SPAA</h1>
+    <p class="game-desc">上空から降下するミサイルや戦闘機を迎撃し、時には空挺ミサイルを操縦せよ！<br>フレンド共闘や機体強化・固有能力で世界平和を守れ。</p>
+    <div id="loadArea" class="hidden">
+      <div class="loadbar"><div id="loadFill"></div></div>
+      <small id="loadText">準備待機中</small>
+    </div>
+  </div>
+  <button id="tapStartBtn" type="button">タップしてスタート</button>
+</div>
+
+<!-- 初回引き継ぎ有無確認モーダル -->
+<div id="transferChoiceModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;">
+    <div class="eyebrow">DATA TRANSFER</div>
+    <h2>引き継ぎデータはありますか？</h2>
+    <p class="modal-sub">以前のセーブデータ（引き継ぎコード）をお持ちの場合は復元できます。</p>
+    <div class="yaju-setup-btns">
+      <button type="button" id="openTransferImportBtn" class="action-btn">引き継ぎコードを入力する</button>
+      <button type="button" id="startNewPlayerBtn" class="action-btn secondary">初めてプレイする（新規作成）</button>
+    </div>
+  </div>
+</div>
+
+<!-- 引き継ぎコード入力モーダル -->
+<div id="transferImportModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">RESTORE SAVE DATA</div>
+    <h2>引き継ぎコード入力</h2>
+    <p class="modal-sub">発行した引き継ぎコード（SPAA54:...）を貼り付けてください。</p>
+    <textarea id="transferImportInput" class="coop-input" rows="3" placeholder="SPAA54:..." style="resize:vertical;"></textarea>
+    <div id="transferImportMsg" class="pda-gacha-msg" style="margin:4px 0 10px;"></div>
+    <div class="setup-footer-btns">
+      <button type="button" id="backTransferChoiceBtn" class="action-btn secondary" style="flex:0.7;">戻る</button>
+      <button type="button" id="confirmTransferImportBtn" class="action-btn" style="flex:1.3;">復元して開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 初回ユーザネーム入力モーダル -->
+<div id="usernameModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">PLAYER SETUP</div>
+    <h2>ユーザネームの設定</h2>
+    <p class="modal-sub">ゲームで使用するユーザネームを入力してください（10文字以内）</p>
+    <input type="text" id="usernameInput" placeholder="例: パルス防衛官" maxlength="10" class="coop-input" style="margin:16px 0;">
+    <button id="saveUsernameBtn" class="action-btn" type="button">決定してゲームへ</button>
+  </div>
+</div>
+
+<!-- ゲームモード＆難易度選択モーダル -->
+<div id="battleSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">MISSION BRIEFING</div>
+    <h2>出撃モード・難易度選択</h2>
+    <p class="modal-sub">① ゲームモードを選択 → ② 難易度を選択 → ③ 出撃開始</p>
+
+    <div class="setup-section">
+      <div class="setup-step-label">① ゲームモード設定（必須）</div>
+      <div class="mode-btn-grid">
+        <button type="button" class="setup-mode-btn" data-mode="FALL_MISSILE">
+          <strong>FALL MISSILE</strong>
+          <span>地上防衛戦 / 5〜10 WAVE迎撃</span>
+        </button>
+        <button type="button" class="setup-mode-btn" data-mode="AIR_STRIKE">
+          <strong>AIR STRIKE</strong>
+          <span>高度100mミサイル降下・ランダム目標</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-step-label">② 難易度選択 <small id="diffLockHint">（※先にゲームモードを選択してください）</small></div>
+      <div id="difficultyBtnGrid" class="diff-btn-grid"></div>
+    </div>
+
+    <div id="setupPreviewBox" class="setup-preview-box">
+      ゲームモードと難易度を選択してください。
+    </div>
+
+    <div class="setup-footer-btns">
+      <button type="button" id="cancelSetupBtn" class="action-btn secondary" style="flex:0.7;">キャンセル</button>
+      <button type="button" id="confirmStartBattleBtn" class="action-btn" disabled style="flex:1.3;">出撃スタート</button>
+    </div>
+  </div>
+</div>
+
+<!-- 共闘出撃待機モーダル（送信側） -->
+<div id="coopWaitModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;">
+    <div class="eyebrow">CO-OP STANDBY</div>
+    <h2>フレンドの応答を待機中…</h2>
+    <p id="coopWaitDesc" class="modal-sub">参加要請を送信しました。相手が「参加」すると共闘で出撃し、「拒否」するとソロモードで出撃します。</p>
+    <div class="wait-pulse-bar"><div class="wait-pulse-fill"></div></div>
+    <button type="button" id="cancelCoopWaitBtn" class="action-btn secondary" style="margin-top:14px;">出撃をキャンセル</button>
+  </div>
+</div>
+
+<!-- 共闘参加要請専用モーダル（受信側） -->
+<div id="coopInviteModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;border-color:#00f5d4;">
+    <div class="eyebrow">CO-OP DISPATCH REQUEST</div>
+    <h2>共闘出撃の参加要請</h2>
+    <p id="coopInviteDesc" class="modal-sub">フレンドが出撃準備を完了しました！</p>
+    <div id="coopInviteSummary" class="setup-preview-box" style="text-align:left;margin:12px 0;"></div>
+    <div class="setup-footer-btns">
+      <button type="button" id="declineCoopInviteBtn" class="action-btn secondary" style="flex:0.8;border-color:#ff4d6d;color:#ffb3c1;">拒否</button>
+      <button type="button" id="acceptCoopInviteBtn" class="action-btn" style="flex:1.2;">参加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- フレンド共闘モーダル -->
+<div id="coopModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">FRIEND CO-OP SYSTEM</div>
+    <h2>フレンド共闘ルーム</h2>
+    <p class="modal-sub">部屋主としてルームIDを発行・募集するか、全体チャットに表示された4桁のルームIDを入力して参加できます。</p>
+    
+    <div class="coop-section">
+      <h3>【部屋主】ルームIDを発行・全体募集</h3>
+      <button id="createRoomBtn" class="action-btn" type="button">4桁ルームIDを発行する</button>
+      <div id="roomCodeDisplay" class="coop-code-display">未発行</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button id="recruitCoopBtn" class="action-btn recruit-btn" type="button" disabled style="flex:1;">全体チャットで募集する</button>
+        <button id="cancelRecruitBtn" class="action-btn secondary" type="button" style="display:none;flex:0.7;border-color:#ff88ff;color:#ffccff;">募集取消</button>
+      </div>
+    </div>
+
+    <hr style="border-color:#35586e;margin:16px 0;">
+
+    <div class="coop-section">
+      <h3>【参加者】ルームに参加</h3>
+      <input type="text" id="joinCodeInput" placeholder="4桁のルームID" maxlength="4" inputmode="numeric" class="coop-input">
+      <button id="joinRoomBtn" class="action-btn secondary" type="button">既存ルームに参加</button>
+    </div>
+
+
+    <hr style="border-color:#35586e;margin:16px 0;">
+
+    <div class="coop-section">
+      <h3>【フレンド追加・一覧】</h3>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input type="text" id="friendCodeInput" placeholder="プレイヤーコード (SPAA-...)" maxlength="16" class="coop-input" style="margin-bottom:0;flex:1.2;">
+        <input type="text" id="friendNameInput" placeholder="表示名(任意)" maxlength="12" class="coop-input" style="margin-bottom:0;flex:0.8;">
+      </div>
+      <button id="addFriendBtn" class="action-btn" type="button">プレイヤーコードでフレンド追加</button>
+      <div id="coopFriendsList" class="skin-list" style="margin-top:10px;max-height:140px;"></div>
+    </div>
+
+    <div id="coopStatusText" class="coop-status">ステータス: 待機中</div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button id="leaveCoopRoomBtn" class="action-btn secondary" type="button" style="background:#8b263e;border-color:#ff6b81;flex:1;display:none;">ルームから退出</button>
+      <button id="closeCoopBtn" class="action-btn secondary" type="button" style="flex:1;">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 機体選択モーダル -->
+<div id="skinSelectModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="eyebrow">UNIT EQUIPMENT SYSTEM</div>
+    <h2>解放された機体</h2>
+    <p class="modal-sub">使用する機体を選択して「完了」を押してください</p>
+    <div id="unlockedSkinsList" class="skin-list"></div>
+    <div class="modal-btn-group">
+      <button id="openUpgradeBtn" class="action-btn upgrade-open-btn" type="button">現在機体のアップグレード・固有能力強化</button>
+      <button id="confirmSkinBtn" class="action-btn" type="button">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 機体アップグレードモーダル -->
+<div id="skinUpgradeModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">UNIT UPGRADE SYSTEM</div>
+      <div class="store-gold">所持ゴールド: <b id="upgradeGoldVal">0</b> G</div>
+    </div>
+    <h2 id="upgradeSkinTitle">機体の強化</h2>
+    <p id="upgradeSkinSub" class="modal-sub">機体ステータスと固有能力（最大Lv.10）を強化できます</p>
+    <div id="upgradeItemsList" class="skin-list"></div>
+    <button id="closeUpgradeBtn" class="action-btn secondary" type="button" style="margin-top:12px;">機体選択へ戻る</button>
+  </div>
+</div>
+
+
+<!-- 情報機器モーダル（ホーム専用） -->
+<div id="pdaModal" class="modal-overlay">
+  <div class="modal-panel pda-panel">
+    <div class="pda-header">
+      <button type="button" id="pdaBackBtn" class="pda-nav-btn hidden">← 戻る</button>
+      <div class="pda-header-center">
+        <span class="pda-status-led"></span>
+        <span id="pdaHeaderTitle" class="pda-header-title">SPAA TACTICAL TERMINAL</span>
+      </div>
+      <button type="button" id="pdaCloseBtn" class="pda-nav-btn pda-close-btn">✕</button>
+    </div>
+
+    <!-- アプリ一覧 -->
+    <div id="pdaView_home" class="pda-app-grid">
+      <button type="button" id="pdaAppMapBtn" class="pda-app-btn"><span>🗺️</span><b>マップ</b></button>
+      <button type="button" id="pdaAppBagBtn" class="pda-app-btn"><span>🎒</span><b>持ち物</b></button>
+      <button type="button" id="pdaAppStoreBtn" class="pda-app-btn"><span>🛒</span><b>ストア</b></button>
+      <button type="button" id="pdaAppGachaBtn" class="pda-app-btn"><span>🎰</span><b>ガチャ</b></button>
+      <button type="button" id="pdaAppChatBtn" class="pda-app-btn"><span>💬</span><b>チャット</b><span id="pdaAppChatDot" class="pda-app-unread-dot hidden"></span></button>
+      <button type="button" id="pdaAppFriendBtn" class="pda-app-btn"><span>👥</span><b>フレンド</b></button>
+      <button type="button" id="pdaAppPlayerBtn" class="pda-app-btn"><span>👤</span><b>プレイヤー</b></button>
+      <button type="button" id="pdaAppTestBtn" class="pda-app-btn"><span>🎯</span><b>テストルーム</b></button>
+      <button type="button" id="pdaAppMysteryBtn" class="pda-app-btn pda-app-mystery"><span>❓</span><b>？</b></button>
+    </div>
+
+    <!-- マップアプリ -->
+    <div id="pdaView_map" class="pda-subview hidden">
+      <p class="modal-sub" style="text-align:center;margin-bottom:8px;">ポータルをタップするとその場所へ移動できます（白点＝現在地）</p>
+      <div class="pda-map-stage">
+        <div id="pdaMapCanvas" class="pda-map-canvas"></div>
+      </div>
+      <div id="pdaMapConfirmBox" class="pda-map-confirm hidden">
+        <p id="pdaMapConfirmText">〜ポータルへ移動しますか？</p>
+        <div class="setup-footer-btns">
+          <button type="button" id="pdaMapNoBtn" class="action-btn secondary">いいえ</button>
+          <button type="button" id="pdaMapYesBtn" class="action-btn">はい</button>
+        </div>
+      </div>
+      <div id="pdaMapLegend" class="pda-map-legend"></div>
+    </div>
+
+    <!-- 持ち物アプリ -->
+    <div id="pdaView_bag" class="pda-subview hidden">
+      <p class="modal-sub" style="margin-bottom:8px;">変更したい枠を選び、下のアイテムをタップしてセットしてください</p>
+      <div id="pdaBagSlots" class="pda-bag-slots"></div>
+      <button type="button" id="pdaBagClearBtn" class="action-btn secondary" style="padding:7px 10px;font-size:12px;margin-bottom:10px;">選択中の枠を外す（空にする）</button>
+      <div id="pdaBagItemList" class="skin-list"></div>
+    </div>
+
+
+    <!-- プレイヤー詳細アプリ -->
+    <div id="pdaView_player" class="pda-subview hidden">
+      <div class="pda-player-card">
+        <div class="pda-player-row"><span>プレイヤーネーム</span><b id="pdaPlayerName">---</b></div>
+        <div class="pda-player-row"><span>プレイヤーコード</span><b id="pdaPlayerCode" style="color:var(--gold);">SPAA------</b></div>
+        <div class="pda-player-row"><span>装備機体</span><b id="pdaPlayerSkin" style="color:var(--accent);">Origin</b></div>
+        <div class="pda-player-row"><span>レベル</span><b id="pdaPlayerLevel">Lv.1</b></div>
+        <div class="pda-xp-wrap">
+          <div class="pda-xp-nums">
+            <span>XP</span>
+            <span id="pdaPlayerXpText">0 / 100</span>
+          </div>
+          <div class="pda-xp-bar"><div id="pdaPlayerXpFill"></div></div>
+        </div>
+      </div>
+
+      <div class="pda-player-card" style="margin-top:10px;">
+        <div class="pda-player-row" style="margin-bottom:6px;">
+          <span>フレンド欄（<b id="pdaFriendCount">0</b>人）</span>
+        </div>
+        <div id="pdaPlayerFriendsList" class="pda-friend-chips"></div>
+      </div>
+
+      <div class="pda-player-card" style="margin-top:10px;">
+        <div class="pda-player-row" style="margin-bottom:6px;"><span>データ引き継ぎ（バックアップ）</span></div>
+        <div class="setup-footer-btns">
+          <button type="button" id="pdaIssueTransferBtn" class="action-btn" style="padding:8px 10px;font-size:12px;">引き継ぎコード発行</button>
+          <button type="button" id="pdaCopyTransferBtn" class="action-btn secondary" style="padding:8px 10px;font-size:12px;">コピー</button>
+        </div>
+        <textarea id="pdaTransferCodeBox" class="coop-input" rows="2" readonly placeholder="ここに引き継ぎコードが表示されます" style="margin-top:8px;font-size:11px;"></textarea>
+      </div>
+    </div>
+
+    <!-- チャットアプリ -->
+    <div id="pdaView_chat" class="pda-subview hidden">
+      <div class="pda-chat-status">
+        <span>全体チャット</span>
+        <small id="chatOnlineCount">(接続中...)</small>
+      </div>
+      <div id="chatMessages" class="chat-messages pda-chat-messages"></div>
+      <div class="chat-input-row pda-chat-input-row">
+        <input type="text" id="chatInput" placeholder="チャットを入力..." maxlength="80" autocomplete="off">
+        <button type="button" id="chatSendBtn">送信</button>
+      </div>
+    </div>
+
+
+  </div>
+</div>
+
+<!-- 全画面ガチャ専用画面 -->
+<div id="gachaScreen" class="gacha-screen hidden" aria-label="ガチャ専用画面">
+  <!-- 背景：5秒ごとに切り替わる目玉アイテム（UR以上）ショーケース -->
+  <div id="gachaBgShowcase" class="gacha-bg-showcase">
+    <div id="gachaBgSlide" class="gacha-bg-slide"></div>
+    <div class="gacha-bg-vignette"></div>
+  </div>
+
+  <!-- 上部バー：戻るボタン & 所持ゴールド・YAJUコイン -->
+  <div class="gacha-topbar">
+    <button type="button" id="gachaBackToPdaBtn" class="gacha-top-back-btn">← 情報機器へ戻る</button>
+    <div class="gacha-currencies">
+      <div class="gacha-currency-pill gold">
+        <span class="cur-label">GOLD</span>
+        <b id="gachaGoldVal">0</b><small>G</small>
+      </div>
+      <div class="gacha-currency-pill yaju">
+        <span class="cur-label">YAJU</span>
+        <b id="gachaCoinVal">0</b><small>Y</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- 左端：ガチャ選択サイドバー（半透明・開閉可能） -->
+  <aside id="gachaSidebar" class="gacha-sidebar open">
+    <div class="gacha-sidebar-inner">
+      <div class="gacha-sidebar-head">
+        <span class="eyebrow" style="margin:0;">GACHA SELECT</span>
+      </div>
+      <div id="gachaBannerList" class="gacha-banner-list"></div>
+    </div>
+    <button type="button" id="gachaSidebarToggleBtn" class="gacha-sidebar-toggle" aria-label="ガチャ選択欄を開閉">◀</button>
+  </aside>
+
+  <!-- 中央ステージ：選択中ガチャタイトル＆結果カード表示 -->
+  <main class="gacha-center-stage">
+    <div class="gacha-active-badge" id="gachaActiveTitle">YAJUガチャ</div>
+    <div id="gachaMsg" class="gacha-msg"></div>
+    <div id="gachaResultsWrap" class="gacha-results-wrap hidden">
+      <div id="gachaResultsGrid" class="pda-gacha-results"></div>
+    </div>
+  </main>
+
+  <!-- 下端中央：1連(100Y) / 10連(1000Y) ボタン -->
+  <div class="gacha-bottom-actions">
+    <button type="button" id="gachaSingleBtn" class="gacha-pull-btn single">
+      <span class="pull-title">1回引く</span>
+      <span class="pull-cost">100 Y</span>
+    </button>
+    <button type="button" id="gachaMultiBtn" class="gacha-pull-btn multi">
+      <span class="pull-title">10連引く</span>
+      <span class="pull-cost">1,000 Y</span>
+    </button>
+  </div>
+
+  <!-- 右下：ガチャの確率情報ボタン -->
+  <button type="button" id="gachaRatesBtn" class="gacha-rates-btn">📊 ガチャの確率情報</button>
+</div>
+
+<!-- ガチャ確率情報モーダル -->
+<div id="gachaRatesModal" class="modal-overlay" style="z-index:115;">
+  <div class="modal-panel gacha-rates-panel">
+    <div class="eyebrow">DROP RATES</div>
+    <h2>YAJUガチャ 排出確率</h2>
+    <div class="gacha-rates-table">
+      <div class="rate-row rate-yajur"><span><b>yajUR</b>（0.5%）</span><small>野獣原爆</small></div>
+      <div class="rate-row rate-ussr"><span><b>USSR</b>（0.5%）</span><small>水素爆弾</small></div>
+      <div class="rate-row rate-ur"><span><b>UR</b>（4.0%）</span><small>電磁防御 / 獣神化石 (80%)・15,000G (20%)</small></div>
+      <div class="rate-row rate-sr"><span><b>SR</b>（25.0%）</span><small>全回復石・半回復石・火力2倍石・速度上昇石 (80%)・10,000G (20%)</small></div>
+      <div class="rate-row rate-r"><span><b>R</b>（70.0%）</span><small>5,000G (100%)</small></div>
+    </div>
+    <button type="button" id="closeGachaRatesBtn" class="action-btn secondary" style="margin-top:14px;">閉じる</button>
+  </div>
+</div>
+
+<!-- ガチャ演出用 暗転・豪華ズームフェードイン・音声再生オーバーレイ -->
+<div id="pdaGachaCutsceneOverlay" class="pda-gacha-cutscene-overlay hidden" aria-hidden="true">
+  <div id="gachaCutsceneAura" class="gacha-cutscene-aura"></div>
+  <div id="gachaCutsceneRays" class="gacha-cutscene-rays"></div>
+  <img id="pdaGachaCutsceneImg" class="gacha-cutscene-img hidden" alt="Gacha Cutscene">
+  <div id="gachaCutsceneBanner" class="gacha-cutscene-banner hidden">
+    <span id="gachaCutsceneRarity" class="cutscene-rarity"></span>
+    <strong id="gachaCutsceneTitle" class="cutscene-title"></strong>
+  </div>
+  <video id="pdaGachaCutsceneVideo" class="gacha-cutscene-video hidden" playsinline webkit-playsinline preload="auto"></video>
+</div>
+
+<!-- ？アプリ用 暗転・読み込み・KING.mp4再生オーバーレイ -->
+<div id="pdaMysteryOverlay" class="pda-mystery-overlay hidden">
+  <div id="pdaMysteryStatus" class="pda-mystery-status hidden">🎥動画を読み込んでいます…</div>
+  <video id="pdaKingVideo" class="pda-king-video hidden" src="https://github.com/omata-kv2/Battle_With_SPAA/releases/download/v1.0/KING.mp4" playsinline webkit-playsinline preload="auto"></video>
+</div>
+
+<!-- ストアモーダル（アイテムショップ / 機体購入） -->
+<div id="skinStoreModal" class="modal-overlay">
+  <div class="modal-panel">
+    <div class="store-header">
+      <div class="eyebrow">SPAA STORE</div>
+      <div class="store-currencies">
+        <span class="store-gold">G: <b id="storeGoldVal">0</b></span>
+        <span class="store-yaju">Y: <b id="storeYajuCoinVal">0</b>枚</span>
+      </div>
+    </div>
+    <div class="store-tabs">
+      <button type="button" id="tabItemShopBtn" class="store-tab-btn active">アイテムショップ</button>
+      <button type="button" id="tabUnitShopBtn" class="store-tab-btn">機体購入</button>
+    </div>
+    <h2 id="storeModalTitle">アイテムショップ</h2>
+    <p id="storeModalSub" class="modal-sub">ゴールドやYAJUコインで戦闘用アイテムを購入できます（複数所持可）</p>
+    <div id="storeItemsList" class="skin-list"></div>
+    <div id="storeSkinsList" class="skin-list hidden"></div>
+    <button id="closeStoreBtn" class="action-btn secondary" type="button" style="margin-top:12px;">閉じる</button>
+  </div>
+</div>
+
+<!-- バトル終了リザルト画面 -->
+<div id="endOverlay" class="hidden">
+  <div class="panel">
+    <div id="endEyebrow" class="eyebrow">WORLD PEACE RESTORED</div>
+    <h1 id="endTitle">MISSION<br>COMPLETE</h1>
+    <p id="endText">全ウェーブを突破。</p>
+    <div class="result-actions">
+      <button id="retryBattleBtn" class="action-btn" type="button">もう一度リトライ</button>
+      <button id="returnHomeBtn" class="action-btn secondary" type="button">ホームへ戻る</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- YAJUMAZE ルール設定モーダル -->
+<div id="yajuSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">YAJUMAZE MODE</div>
+    <h1 class="yaju-modal-title">YAJUMAZE</h1>
+    <p class="modal-sub">全5階層の迷路脱出、またはボス戦に挑戦しよう。</p>
+
+    <div class="yaju-settings-group">
+      <div class="yaju-toggle-row">
+        <span>累進YAJU数</span>
+        <label class="yaju-switch">
+          <input type="checkbox" id="yajuSettingProgressive" checked>
+          <span class="yaju-slider"></span>
+        </label>
+      </div>
+      <div class="yaju-toggle-row">
+        <span>各種コンパスの使用</span>
+        <label class="yaju-switch">
+          <input type="checkbox" id="yajuSettingCompass" checked>
+          <span class="yaju-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="yaju-setup-btns">
+      <button type="button" id="yajuStartNormalBtn" class="action-btn">この設定でスタート</button>
+      <button type="button" id="yajuOpenBossSetupBtn" class="action-btn upgrade-open-btn">ボス戦</button>
+      <button type="button" id="yajuCancelSetupBtn" class="action-btn secondary">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE iPad警告モーダル -->
+<div id="yajuIpadWarnModal" class="modal-overlay">
+  <div class="modal-panel" style="text-align:center;border-color:#ff4d6d;">
+    <div class="eyebrow" style="color:#ff4d6d;">PERFORMANCE WARNING</div>
+    <h2>動作環境のご注意</h2>
+    <p class="yaju-ipad-warn-text">iPadでは動作が保証されていません！！それでも始めますか？</p>
+    <div class="yaju-setup-btns" style="margin-top:14px;">
+      <button type="button" id="yajuIpadConfirmBtn" class="action-btn">了解した</button>
+      <button type="button" id="yajuIpadCancelBtn" class="action-btn secondary">iPadなので止めておきます</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE ボス・難易度選択モーダル -->
+<div id="yajuBossSetupModal" class="modal-overlay">
+  <div class="modal-panel setup-modal-panel">
+    <div class="eyebrow">YAJUMAZE BOSS BATTLE</div>
+    <h2>ボス・難易度選択</h2>
+    <p class="modal-sub">① ボスを選択 → ② 難易度を選択 → ③ ボス戦開始</p>
+
+    <div class="setup-section">
+      <div class="setup-step-label">① ボス選択（必須）</div>
+      <div id="yajuBossBtnGrid" class="mode-btn-grid"></div>
+    </div>
+
+    <div class="setup-section">
+      <div class="setup-step-label">② 難易度選択 <small id="yajuDiffLockHint">（※先にボスを選択してください）</small></div>
+      <div id="yajuBossDiffGrid" class="diff-btn-grid"></div>
+    </div>
+
+    <div id="yajuBossPreviewBox" class="setup-preview-box">
+      ① まず上の <b>world enemy</b> または <b>獣王</b> を選択してください。
+    </div>
+
+    <div class="setup-footer-btns">
+      <button type="button" id="yajuCancelBossSetupBtn" class="action-btn secondary" style="flex:0.7;">戻る</button>
+      <button type="button" id="yajuBossStartBtn" class="action-btn" disabled style="flex:1.3;">ボス戦スタート</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAJUMAZE リザルトオーバーレイ -->
+<div id="yajuEndOverlay" class="yaju-end-overlay hidden">
+  <div class="modal-panel" style="text-align:center;">
+    <div id="yajuEndEyebrow" class="eyebrow">YAJUMAZE</div>
+    <h1 id="yajuEndTitle">STAGE CLEAR</h1>
+    <p id="yajuEndText" class="modal-sub" style="font-size:14px;color:#eaf8ff;margin-top:8px;"></p>
+    <div id="yajuEndButtons" class="yaju-setup-btns" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<audio id="bgm-yarimasune" src="./assets/sounds/yarimasune.mp3" loop></audio>
+<audio id="se-provoke" src="./assets/sounds/114514.mp3"></audio>
+<audio id="se-boom" src="./assets/sounds/boom.mp3"></audio>
+<audio id="se-start" src="./assets/sounds/start.mp3"></audio>
+<audio id="se-totugeki" src="./assets/sounds/totugeki.mp3"></audio>
+<audio id="se-restart" src="./assets/sounds/restart.mp3"></audio>
+<audio id="se-clear" src="./assets/sounds/clear.mp3"></audio>
+<audio id="gacha-audio-ussr" src="./assets/sounds/USSR.mp3" preload="auto"></audio>
+<audio id="gacha-audio-yajur" src="./assets/sounds/114514.mp3" preload="auto"></audio>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  var btn = document.getElementById("tapStartBtn");
+  if(btn){
+    btn.addEventListener("click", function(){
+      if(!window.__spaaAppLoaded){
+        window.__spaaShowBootError("ゲームスクリプト(js/app.js)の読み込みが完了していません。ブラウザのコンソールやキャッシュ、js/libs/ 内のファイルを確認してください。");
+      }
+    });
+  }
+});
+</script>
+<script type="module">
+  async function diagnoseFailedModules() {
+    const files = [
+      "./js/libs/three.module.js",
+      "./js/libs/GLTFLoader.js",
+      "./js/config.js",
+      "./js/yaju-config.js",
+      "./js/state.js",
+      "./js/ui.js",
+      "./js/yaju-collision.js",
+      "./js/yaju-world.js",
+      "./js/map-home.js",
+      "./js/map-skin.js",
+      "./js/map-fall-missile.js",
+      "./js/map-air-strike.js",
+      "./js/enemies.js",
+      "./js/mode-fall-missile.js",
+      "./js/mode-air-strike.js",
+      "./js/mode-yaju-maze.js",
+      "./js/player.js",
+      "./js/controls.js",
+      "./js/modals.js",
+      "./js/multiplayer.js",
+      "./js/items.js",
+      "./js/sfx.js",
+      "./js/pda.js",
+      "./js/map-test.js",
+      "./js/app.js"
+    ];
+    const problems = [];
+    for (const f of files) {
+      try {
+        const res = await fetch(f, { cache: "no-store" });
+        if (!res.ok) {
+          problems.push(f + " -> HTTP " + res.status);
+        } else {
+          const txt = await res.text();
+          if (txt.trim().startsWith("// Failed to download")) {
+            problems.push(f + " -> 中身が空のダミーファイルです");
+          }
+        }
+      } catch (e) {
+        problems.push(f + " -> fetch失敗: " + (e.message || e));
+      }
+    }
+    if (problems.length > 0) {
+      return "問題が見つかったファイル:\n" + problems.join("\n");
+    }
+    for (const f of files) {
+      try {
+        await import(f + "?diag=" + Date.now());
+      } catch (e) {
+        return "import失敗: " + f + "\n" + (e && e.message ? e.message : String(e));
+      }
+    }
+    return "全ファイル200 OKですが、app.jsの読み込みに失敗しました。";
+  }
+
+  import("./js/app.js?v=56").then(function(){
+    window.__spaaAppLoaded = true;
+  }).catch(async function(err){
+    var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);
+    var detail = await diagnoseFailedModules();
+    if(window.__spaaShowBootError){
+      window.__spaaShowBootError("モジュール読み込み失敗:\n" + msg + "\n\n" + detail);
+    }
+  });
+</script>
+</body>
+</html>
