@@ -27,7 +27,7 @@ import { buildWorld, normalizeModel } from './map-fall-missile.js';
 import {
   coopState, bindMultiplayerCallbacks, resetCoopMatchFlags, sendCoop, getCoopContext,
   initiateCoopBattleRequest, cancelOutgoingBattleInvite, respondToBattleInvite,
-  clearRemoteVisuals, createRemotePlayerMesh, initRemoteAirStrikeCraft,
+  clearRemoteVisuals, createRemotePlayerMesh,
   syncCoopFrame, ensureLobbyInitialized,
   sendGlobalChatMessage, publishCoopRecruit, cancelMyCoopRecruit,
   leaveCoopRoom, createCoopRoom, joinCoopRoom
