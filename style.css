@@ -70,11 +70,12 @@ html,body{
 }
 .chat-unread-dot{
   position:absolute;
-  top:6px;
-  right:6px;
-  width:10px;
-  height:10px;
+  top:-4px;
+  right:-4px;
+  width:12px;
+  height:12px;
   border-radius:50%;
+  border:2px solid #071522;
   background:var(--danger);
   box-shadow:0 0 8px var(--danger);
 }
@@ -145,22 +146,6 @@ html,body{
 }
 
 /* モードバナー & トースト */
-#modeBanner{
-  position:fixed;
-  top:max(14px,env(safe-area-inset-top));
-  left:50%;
-  transform:translateX(-50%);
-  padding:6px 16px;
-  border-radius:999px;
-  background:var(--panel);
-  border:1px solid var(--border);
-  font-size:12px;
-  font-weight:800;
-  letter-spacing:.08em;
-  color:var(--accent);
-  white-space:nowrap;
-  box-shadow:0 4px 16px rgba(0,0,0,.45);
-}
 #toastBanner{
   position:fixed;
   top:64px;
@@ -870,44 +855,124 @@ body.yaju-boss-active .yaju-controls,
 .pda-open-btn{
   position:fixed;
   top:max(12px,env(safe-area-inset-top));
-  right:max(12px,env(safe-area-inset-right));
+  left:max(12px,env(safe-area-inset-left));
   z-index:26;
   pointer-events:auto;
-  padding:8px 14px;
+  padding:9px 15px;
   border-radius:12px;
-  border:1px solid var(--accent);
-  background:var(--panel);
-  color:var(--text);
+  border:1px solid rgba(0,245,212,.55);
+  background:linear-gradient(135deg,rgba(10,30,48,.88),rgba(5,16,28,.94));
+  backdrop-filter:blur(10px);
+  color:#eaf8ff;
   font-size:13px;
   font-weight:800;
+  letter-spacing:.04em;
   cursor:pointer;
-  box-shadow:0 4px 14px rgba(0,0,0,.5);
+  box-shadow:0 6px 20px rgba(0,0,0,.5), 0 0 12px rgba(0,245,212,.18);
   touch-action:manipulation;
+  transition:transform .12s ease, box-shadow .2s ease;
 }
+.pda-open-btn:active{transform:scale(.96)}
+
 .pda-panel{
-  border:2px solid var(--accent2);
-  background:rgba(7,20,34,.96);
+  position:relative;
+  border:1px solid rgba(0,245,212,.45);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(0,245,212,.09), transparent 45%),
+    radial-gradient(circle at 85% 90%, rgba(56,200,240,.08), transparent 45%),
+    linear-gradient(160deg,rgba(8,22,38,.97),rgba(4,12,22,.98));
+  box-shadow:
+    0 24px 60px rgba(0,0,0,.8),
+    0 0 32px rgba(0,245,212,.14),
+    inset 0 1px 0 rgba(255,255,255,.1);
+  backdrop-filter:blur(16px);
+  border-radius:20px;
+  overflow:hidden;
+}
+.pda-panel::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(56,200,240,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(56,200,240,.035) 1px,transparent 1px);
+  background-size:20px 20px;
+  pointer-events:none;
 }
 .pda-header{
-  display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--border);
+  position:relative;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-bottom:12px;margin-bottom:14px;
+  border-bottom:1px solid rgba(56,200,240,.22);
 }
-.pda-header-title{font-size:14px;font-weight:900;color:var(--accent);letter-spacing:.05em}
+.pda-header-center{
+  display:flex;align-items:center;gap:8px;min-width:0;
+}
+.pda-status-led{
+  width:8px;height:8px;border-radius:50%;
+  background:#00f5d4;
+  box-shadow:0 0 10px #00f5d4;
+  flex-shrink:0;
+}
+.pda-header-title{
+  font-size:13px;font-weight:900;color:#eaf8ff;
+  letter-spacing:.1em;text-transform:uppercase;
+  text-shadow:0 0 10px rgba(0,245,212,.35);
+}
 .pda-nav-btn{
-  padding:5px 10px;border-radius:8px;border:1px solid var(--border);
-  background:#0e2a42;color:var(--text);font-size:12px;font-weight:800;cursor:pointer;
+  padding:6px 12px;border-radius:9px;
+  border:1px solid rgba(56,200,240,.32);
+  background:rgba(14,42,68,.75);
+  color:#d9f7ff;font-size:12px;font-weight:800;cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, transform .1s ease;
+}
+.pda-nav-btn:hover{background:rgba(20,58,92,.9);border-color:var(--accent)}
+.pda-nav-btn:active{transform:scale(.95)}
+.pda-close-btn{
+  width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;
 }
 .pda-app-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:6px 0;
+  position:relative;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:11px;padding:4px 0;
 }
 .pda-app-btn{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  padding:16px 8px;border-radius:14px;border:1px solid var(--border);
-  background:#0c253b;color:var(--text);cursor:pointer;touch-action:manipulation;
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:16px 8px;border-radius:15px;
+  border:1px solid rgba(56,200,240,.24);
+  background:linear-gradient(155deg,rgba(16,46,74,.72),rgba(7,22,38,.9));
+  color:#eaf8ff;cursor:pointer;touch-action:manipulation;
+  box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .14s ease, border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  overflow:hidden;
 }
-.pda-app-btn span{font-size:26px;line-height:1}
-.pda-app-btn b{font-size:12px}
-.pda-app-btn.pda-app-mystery{border-color:#ff4d6d;background:rgba(60,12,24,.75)}
+.pda-app-btn::after{
+  content:"";
+  position:absolute;
+  top:0;left:18%;right:18%;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(0,245,212,.65),transparent);
+  opacity:.65;
+}
+.pda-app-btn:hover{
+  transform:translateY(-2px);
+  border-color:rgba(0,245,212,.65);
+  box-shadow:0 10px 22px rgba(0,0,0,.45), 0 0 16px rgba(0,245,212,.22);
+}
+.pda-app-btn:active{transform:scale(.96)}
+.pda-app-btn span:first-child{
+  font-size:26px;line-height:1;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));
+}
+.pda-app-btn b{
+  font-size:11.5px;font-weight:800;letter-spacing:.04em;color:#dff6ff;
+}
+.pda-app-btn.pda-app-mystery{
+  border-color:rgba(255,77,109,.55);
+  background:linear-gradient(155deg,rgba(68,14,30,.75),rgba(28,6,14,.92));
+}
+.pda-app-btn.pda-app-mystery::after{
+  background:linear-gradient(90deg,transparent,rgba(255,77,109,.8),transparent);
+}
 
 .pda-map-stage{display:flex;justify-content:center;margin:6px 0 10px}
 .pda-map-canvas{
@@ -978,8 +1043,9 @@ body.yaju-boss-active .yaju-controls,
    ========================================== */
 .player-plate{
   position:fixed;
-  top:calc(max(12px,env(safe-area-inset-top)) + 54px);
-  left:max(12px,env(safe-area-inset-left));
+  top:max(12px,env(safe-area-inset-top));
+  right:max(12px,env(safe-area-inset-right));
+  left:auto;
   z-index:16;
   display:flex;align-items:center;gap:9px;
   padding:6px 12px 6px 8px;
@@ -1075,24 +1141,640 @@ body.yaju-boss-active .yaju-controls,
   .inv-slot{width:42px;height:42px}
   .item-inv-bar{top:56px}
   .exp-meter-frame{width:26px;height:132px}
-  .player-plate{top:max(10px,env(safe-area-inset-top));left:66px;padding:4px 10px 4px 6px}
+  .player-plate{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));left:auto;padding:4px 10px 4px 6px}
 }
 
-/* v5.8Ω 視点切替ボタン */
-.cam-view-btn{
+/* ==========================================
+   v5.5 テストルームDPS・PDAチャット・ガチャ報酬＆演出
+   ========================================== */
+.test-dps-hud{
   position:fixed;
-  top:calc(max(12px,env(safe-area-inset-top)) + 44px);
+  top:calc(max(12px,env(safe-area-inset-top)) + 54px);
+  left:max(12px,env(safe-area-inset-left));
+  z-index:20;
+  display:inline-flex;
+  align-items:baseline;
+  gap:6px;
+  padding:4px 9px;
+  border-radius:10px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  box-shadow:0 4px 12px rgba(0,0,0,.45);
+  pointer-events:none;
+}
+.test-dps-label{
+  font-size:10px;
+  font-weight:800;
+  color:var(--muted);
+  letter-spacing:.06em;
+}
+.test-dps-val{
+  min-width:6.2ch;
+  text-align:right;
+  font-size:14px;
+  font-weight:900;
+  color:#a8ff60;
+  font-variant-numeric:tabular-nums;
+}
+
+.pda-app-btn{position:relative}
+.pda-app-unread-dot{
+  position:absolute;
+  top:6px;
+  right:6px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--danger);
+  box-shadow:0 0 8px var(--danger);
+}
+.pda-chat-status{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:6px 10px;
+  margin-bottom:6px;
+  border-radius:8px;
+  background:#0a2236;
+  border:1px solid var(--border);
+  font-size:12px;
+  font-weight:700;
+}
+.pda-chat-status small{color:var(--accent)}
+.pda-chat-messages{
+  height:230px;
+  background:#071726;
+  border:1px solid var(--border);
+  border-radius:10px;
+  margin-bottom:8px;
+}
+.pda-chat-input-row{
+  border-radius:10px;
+  border:1px solid var(--border);
+}
+
+.pda-gacha-results{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  max-height:260px;
+  overflow-y:auto;
+  padding:4px;
+}
+.pda-gacha-results.single{
+  grid-template-columns:minmax(0,220px);
+  justify-content:center;
+}
+.gacha-card{
+  position:relative;
+  border-radius:10px;
+  background:#071726;
+  padding:8px 6px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  min-height:62px;
+  transition:transform .18s ease, opacity .18s ease;
+}
+.gacha-card-unrevealed{
+  border:2px dashed #35586e;
+  background:#091c2e;
+  color:var(--muted);
+  font-size:16px;
+  font-weight:900;
+}
+.gacha-card-rarity{
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.gacha-card-name{
+  font-size:12px;
+  font-weight:800;
+  color:#fff;
+  line-height:1.25;
+}
+.gacha-card-r{
+  border:2px solid #4de6ff;
+}
+.gacha-card-r .gacha-card-rarity{color:#4de6ff}
+.gacha-card-sr{
+  border:2px solid #ffd23f;
+}
+.gacha-card-sr .gacha-card-rarity{color:#ffd23f}
+.gacha-card-ur{
+  border:2px solid #e028b8;
+  box-shadow:0 0 14px rgba(224,40,184,.85), inset 0 0 8px rgba(255,80,220,.35);
+}
+.gacha-card-ur .gacha-card-rarity{color:#ff6be6}
+.gacha-card-ussr{
+  border:2.5px solid #CD0000;
+  box-shadow:0 0 16px rgba(255,215,0,.95), 0 0 28px rgba(255,190,0,.6);
+}
+.gacha-card-ussr .gacha-card-rarity{color:#ff5252}
+.gacha-card-yajur{
+  padding:2.5px;
+  background:linear-gradient(135deg,#ff3b30,#ff9500,#ffcc00,#34c759,#00c7be,#007aff,#af52de);
+  box-shadow:0 0 18px rgba(139,69,19,.95), 0 0 30px rgba(160,82,45,.75);
+  border:none;
+}
+.gacha-card-yajur-inner{
+  width:100%;
+  height:100%;
+  border-radius:8px;
+  background:#071726;
+  padding:6px 5px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+}
+.gacha-card-yajur .gacha-card-rarity{
+  background:linear-gradient(90deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff,#c77dff);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+
+.pda-gacha-cutscene-overlay{
+  position:fixed;
+  inset:0;
+  background:#000;
+  z-index:120;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:auto;
+  opacity:0;
+}
+.gacha-cutscene-img{
+  position:relative;
+  z-index:2;
+  max-width:86vw;
+  max-height:76vh;
+  object-fit:contain;
+  opacity:0;
+}
+.gacha-cutscene-video{
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+  object-fit:contain;
+  background:#000;
+  z-index:3;
+}
+
+/* ==========================================
+   v5.6 全画面ガチャ専用画面・5秒目玉背景・豪華演出
+   ========================================== */
+.gacha-screen{
+  position:fixed;
+  inset:0;
+  z-index:105;
+  background:#040b14;
+  color:#eaf8ff;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.gacha-bg-showcase{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.gacha-bg-slide{
+  position:relative;
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:opacity .55s ease, transform .55s ease;
+}
+.gacha-bg-slide.fading{
+  opacity:0;
+  transform:scale(.97);
+}
+.gacha-bg-img{
+  max-width:78vw;
+  max-height:70vh;
+  object-fit:contain;
+  filter:drop-shadow(0 0 40px rgba(255,255,255,.28));
+  animation:gachaFloat 4.5s ease-in-out infinite alternate;
+}
+@keyframes gachaFloat{
+  from{transform:translateY(4px) scale(1)}
+  to{transform:translateY(-8px) scale(1.03)}
+}
+.gacha-showcase-card{
+  width:min(420px,82vw);
+  padding:28px 24px;
+  border-radius:24px;
+  text-align:center;
+  background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.1),rgba(6,18,32,.86));
+  backdrop-filter:blur(10px);
+  animation:gachaFloat 4.5s ease-in-out infinite alternate;
+}
+.gacha-showcase-card.rarity-ur{
+  border:2px solid rgba(224,40,184,.85);
+  box-shadow:0 0 42px rgba(224,40,184,.45), inset 0 0 24px rgba(224,40,184,.2);
+}
+.gacha-showcase-card.rarity-ussr{
+  border:2.5px solid #CD0000;
+  box-shadow:0 0 50px rgba(255,215,0,.55), inset 0 0 24px rgba(205,0,0,.25);
+}
+.gacha-showcase-card.rarity-yajur{
+  border:2.5px solid #ffd23f;
+  box-shadow:0 0 54px rgba(139,69,19,.85), 0 0 26px rgba(255,140,0,.45);
+}
+.gacha-showcase-icon{font-size:56px;line-height:1.1;margin-bottom:10px}
+.gacha-showcase-rarity{font-size:12px;font-weight:900;letter-spacing:.18em;opacity:.92}
+.gacha-showcase-title{font-size:24px;font-weight:900;margin:6px 0;color:#fff}
+.gacha-showcase-desc{font-size:12px;color:#b8d8eb;line-height:1.5}
+.gacha-bg-vignette{
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at center,transparent 25%,rgba(3,9,18,.78) 100%);
+  pointer-events:none;
+}
+
+.gacha-topbar{
+  position:relative;
+  z-index:5;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));
+  background:linear-gradient(180deg,rgba(4,12,22,.88),rgba(4,12,22,0));
+}
+.gacha-top-back-btn{
+  padding:8px 14px;
+  border-radius:10px;
+  border:1px solid rgba(56,200,240,.45);
+  background:rgba(10,28,46,.82);
+  backdrop-filter:blur(8px);
+  color:#eaf8ff;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.gacha-currencies{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.gacha-currency-pill{
+  display:inline-flex;
+  align-items:baseline;
+  gap:5px;
+  padding:6px 12px;
+  border-radius:999px;
+  background:rgba(7,20,34,.82);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.16);
+  font-size:13px;
+}
+.gacha-currency-pill .cur-label{font-size:10px;font-weight:800;opacity:.75;letter-spacing:.08em}
+.gacha-currency-pill.gold b{color:var(--gold)}
+.gacha-currency-pill.yaju b{color:#ff9ebb}
+.gacha-currency-pill small{font-size:10px;opacity:.85}
+
+.gacha-sidebar{
+  position:fixed;
+  top:calc(max(12px,env(safe-area-inset-top)) + 52px);
+  left:0;
+  bottom:96px;
+  width:min(260px,42vw);
+  z-index:6;
+  display:flex;
+  align-items:stretch;
+  transition:transform .26s cubic-bezier(.22,1,.36,1);
+}
+.gacha-sidebar.closed{
+  transform:translateX(-100%);
+}
+.gacha-sidebar-inner{
+  flex:1;
+  background:rgba(7,18,32,.72);
+  backdrop-filter:blur(14px);
+  border-top:1px solid rgba(56,200,240,.35);
+  border-right:1px solid rgba(56,200,240,.35);
+  border-bottom:1px solid rgba(56,200,240,.35);
+  border-radius:0 16px 16px 0;
+  padding:12px 10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  overflow-y:auto;
+}
+.gacha-sidebar-head{
+  padding-bottom:8px;
+  border-bottom:1px solid rgba(56,200,240,.22);
+}
+.gacha-banner-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.gacha-banner-item{
+  width:100%;
+  text-align:left;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(56,200,240,.28);
+  background:rgba(12,34,56,.68);
+  color:#eaf8ff;
+  cursor:pointer;
+  transition:border-color .15s ease, background .15s ease;
+}
+.gacha-banner-item.active{
+  border-color:#00f5d4;
+  background:linear-gradient(135deg,rgba(0,245,212,.22),rgba(14,42,68,.85));
+  box-shadow:0 0 14px rgba(0,245,212,.25);
+}
+.gacha-banner-item strong{display:block;font-size:13px;font-weight:900}
+.gacha-banner-item span{display:block;font-size:10px;color:#9be8ff;margin-top:2px}
+.gacha-sidebar-toggle{
+  position:absolute;
+  top:16px;
+  right:-30px;
+  width:30px;
+  height:48px;
+  border-radius:0 10px 10px 0;
+  border:1px solid rgba(56,200,240,.4);
+  border-left:none;
+  background:rgba(7,18,32,.82);
+  backdrop-filter:blur(10px);
+  color:#00f5d4;
+  font-size:13px;
+  font-weight:900;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.gacha-center-stage{
+  position:relative;
+  z-index:3;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:10px 16px 88px;
+  pointer-events:none;
+}
+.gacha-active-badge{
+  padding:5px 16px;
+  border-radius:999px;
+  background:rgba(7,20,34,.78);
+  border:1px solid rgba(0,245,212,.45);
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.08em;
+  color:#00f5d4;
+  margin-bottom:6px;
+}
+.gacha-msg{
+  min-height:18px;
+  font-size:13px;
+  font-weight:800;
+  color:#ffd23f;
+  text-shadow:0 2px 6px #000;
+  margin-bottom:8px;
+}
+.gacha-results-wrap{
+  width:min(540px,92vw);
+  max-height:54vh;
+  background:rgba(5,15,28,.82);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(56,200,240,.35);
+  border-radius:16px;
+  padding:12px;
+  pointer-events:auto;
+  overflow-y:auto;
+}
+.gacha-results-wrap .pda-gacha-results{
+  margin-top:0;
+  max-height:none;
+}
+
+.gacha-bottom-actions{
+  position:fixed;
+  bottom:max(16px,env(safe-area-inset-bottom));
+  left:50%;
+  transform:translateX(-50%);
+  z-index:7;
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+.gacha-pull-btn{
+  min-width:126px;
+  padding:10px 18px;
+  border-radius:14px;
+  border:1.5px solid rgba(255,255,255,.3);
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  color:#041520;
+  font-weight:900;
+  box-shadow:0 8px 24px rgba(0,0,0,.55);
+  transition:transform .12s ease, filter .15s ease;
+}
+.gacha-pull-btn:active{transform:scale(.95)}
+.gacha-pull-btn:disabled{opacity:.5;cursor:not-allowed}
+.gacha-pull-btn.single{
+  background:linear-gradient(135deg,#38c8f0,#00f5d4);
+}
+.gacha-pull-btn.multi{
+  background:linear-gradient(135deg,#ffd23f,#ff9233);
+}
+.gacha-pull-btn .pull-title{font-size:14px}
+.gacha-pull-btn .pull-cost{font-size:11px;opacity:.9}
+
+.gacha-rates-btn{
+  position:fixed;
+  bottom:max(16px,env(safe-area-inset-bottom));
+  right:max(14px,env(safe-area-inset-right));
+  z-index:7;
+  padding:9px 13px;
+  border-radius:11px;
+  border:1px solid rgba(56,200,240,.45);
+  background:rgba(7,20,34,.85);
+  backdrop-filter:blur(8px);
+  color:#d9f7ff;
+  font-size:11.5px;
+  font-weight:800;
+  cursor:pointer;
+}
+@media (max-width: 560px){
+  .gacha-bottom-actions{
+    left:max(12px,env(safe-area-inset-left));
+    transform:none;
+    gap:8px;
+  }
+  .gacha-pull-btn{min-width:98px;padding:8px 12px}
+  .gacha-rates-btn{padding:8px 10px;font-size:11px}
+}
+
+.gacha-rates-table{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:12px;
+}
+.rate-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:9px 12px;
+  border-radius:10px;
+  background:#091f32;
+  border:1px solid rgba(255,255,255,.12);
+  font-size:12px;
+}
+.rate-row small{color:#b8d8eb;text-align:right}
+.rate-row.rate-yajur{border-color:#ff9233;box-shadow:0 0 10px rgba(139,69,19,.55)}
+.rate-row.rate-ussr{border-color:#CD0000;box-shadow:0 0 10px rgba(255,215,0,.4)}
+.rate-row.rate-ur{border-color:#e028b8}
+.rate-row.rate-sr{border-color:#ffd23f}
+.rate-row.rate-r{border-color:#4de6ff}
+
+/* 豪華ズーム＋フェードイン演出 */
+.gacha-cutscene-aura{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  z-index:1;
+  pointer-events:none;
+  transition:opacity 1.2s ease;
+}
+.gacha-cutscene-aura.ussr{
+  background:radial-gradient(circle at center,rgba(255,215,0,.38),rgba(205,0,0,.32) 48%,transparent 76%);
+}
+.gacha-cutscene-aura.yajur{
+  background:radial-gradient(circle at center,rgba(255,210,63,.35),rgba(160,82,45,.45) 48%,transparent 76%);
+}
+.gacha-cutscene-rays{
+  position:absolute;
+  width:160vmax;
+  height:160vmax;
+  z-index:1;
+  opacity:0;
+  pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.16) 0deg 8deg,transparent 8deg 20deg);
+  animation:gachaRaysSpin 12s linear infinite;
+  transition:opacity 1.2s ease;
+}
+@keyframes gachaRaysSpin{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+.gacha-cutscene-img{
+  transform:scale(.55);
+  filter:drop-shadow(0 0 36px rgba(255,255,255,.55));
+}
+.gacha-cutscene-banner{
+  position:fixed;
+  bottom:12vh;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:4;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  padding:10px 26px;
+  border-radius:14px;
+  background:rgba(6,16,28,.86);
+  border:2px solid #ffd23f;
+  box-shadow:0 0 30px rgba(255,215,0,.55);
+  animation:bannerPop .45s ease-out;
+}
+@keyframes bannerPop{
+  from{opacity:0;transform:translateX(-50%) scale(.85)}
+  to{opacity:1;transform:translateX(-50%) scale(1)}
+}
+.cutscene-rarity{font-size:13px;font-weight:900;letter-spacing:.2em;color:#ffd23f}
+.cutscene-title{font-size:22px;font-weight:900;color:#fff}
+
+/* ==========================================
+   v5.7 PlayWars HUD & ジャンプボタン
+   ========================================== */
+.jump-btn{
+  border-color:rgba(199,125,255,.75) !important;
+  background:linear-gradient(135deg,rgba(60,24,96,.88),rgba(20,10,42,.94)) !important;
+  color:#f3d9ff !important;
+}
+.pw-hud{
+  position:fixed;
+  top:max(12px,env(safe-area-inset-top));
+  left:50%;
+  transform:translateX(-50%);
+  z-index:20;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:7px 12px;
+  border-radius:14px;
+  background:rgba(7,18,32,.84);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(199,125,255,.45);
+  box-shadow:0 6px 20px rgba(0,0,0,.5);
+  width:min(460px,92vw);
+}
+.pw-hp-box{flex:1;min-width:0}
+.pw-hp-head{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10.5px;font-weight:800;margin-bottom:4px;
+}
+.pw-hp-box.you .pw-hp-head span{color:#00f5d4}
+.pw-hp-box.enemy .pw-hp-head span{color:#ff6b81}
+.pw-hp-bar{
+  width:100%;height:8px;border-radius:999px;background:#091a2a;overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+}
+.pw-hp-box.you .pw-hp-bar > div{height:100%;width:100%;background:linear-gradient(90deg,#00f5d4,#38c8f0);transition:width .18s ease}
+.pw-hp-box.enemy .pw-hp-bar > div{height:100%;width:100%;background:linear-gradient(90deg,#ff4d6d,#ff9233);transition:width .18s ease}
+.pw-vs-badge{
+  font-size:12px;font-weight:900;color:#c77dff;letter-spacing:.08em;flex-shrink:0;
+}
+
+/* ==========================================
+   v5.8α 1人称 / 3人称 視点切り替えボタン
+   ========================================== */
+.cam-view-toggle-btn{
+  position:fixed;
+  top:calc(max(12px,env(safe-area-inset-top)) + 64px);
   right:max(12px,env(safe-area-inset-right));
   z-index:26;
   pointer-events:auto;
-  padding:6px 12px;
+  padding:7px 12px;
   border-radius:10px;
-  border:1px solid rgba(255,255,255,0.28);
-  background:rgba(12,18,28,0.82);
-  color:#e8f4ff;
-  font-size:12px;
-  font-weight:700;
+  border:1px solid rgba(0,245,212,.5);
+  background:rgba(7,20,34,.84);
+  backdrop-filter:blur(8px);
+  color:#d9f7ff;
+  font-size:11.5px;
+  font-weight:800;
   cursor:pointer;
-  backdrop-filter:blur(6px);
+  box-shadow:0 4px 14px rgba(0,0,0,.45);
+  touch-action:manipulation;
 }
-.cam-view-btn:active{transform:scale(0.96);}
+.cam-view-toggle-btn:active{transform:scale(.95)}

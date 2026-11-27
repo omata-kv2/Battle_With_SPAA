@@ -10,7 +10,7 @@ export const VEHICLE_FOLDER_MAP = {
 };
 
 // 3D機体システム適用機体（Origin, Explosion, Wirbelwind）
-export const EXPERIMENTAL_3D_SKINS = new Set(['Origin', 'Explosion', 'Scatter', 'Wirbelwind']);
+export const EXPERIMENTAL_3D_SKINS = new Set(['Origin', 'RapidFire', 'Explosion', 'Scatter', 'Wirbelwind']);
 
 export const DEFAULT_VEHICLE_CONFIG = {
   hasTurret: true,

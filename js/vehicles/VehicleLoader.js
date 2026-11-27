@@ -25,6 +25,24 @@ function createFallbackHull(skinId = 'Origin'){
     return group;
   }
 
+  if(skinId === 'RapidFire'){
+    const bodyMat = new T.MeshStandardMaterial({ color: 0xb8c2cc, roughness: 0.28, metalness: 0.82 });
+    const trackMat = new T.MeshStandardMaterial({ color: 0x121619, roughness: 0.85, metalness: 0.2 });
+    const redMat = new T.MeshBasicMaterial({ color: 0xff2244 });
+    const chassis = new T.Mesh(new T.BoxGeometry(2.55, 0.85, 4.9), bodyMat);
+    chassis.position.set(0, 0.72, 0);
+    group.add(chassis);
+    [-1.42, 1.42].forEach((tx) => {
+      const track = new T.Mesh(new T.BoxGeometry(0.54, 0.72, 5.1), trackMat);
+      track.position.set(tx, 0.36, 0);
+      group.add(track);
+    });
+    const line = new T.Mesh(new T.BoxGeometry(1.9, 0.08, 0.08), redMat);
+    line.position.set(0, 0.9, -2.48);
+    group.add(line);
+    return group;
+  }
+
   if(skinId === 'Scatter'){
     const bodyMat = new T.MeshStandardMaterial({ color: 0x1e4d2b, roughness: 0.42, metalness: 0.55 });
     const trackMat = new T.MeshStandardMaterial({ color: 0x121619, roughness: 0.85, metalness: 0.2 });
@@ -78,6 +96,23 @@ function createFallbackTurret(skinId = 'Origin'){
   const isWirbel = skinId === 'Wirbelwind';
   const group = new T.Group();
   group.name = `${skinId}_Turret_Fallback`;
+
+  if(skinId === 'RapidFire'){
+    const turretMat = new T.MeshStandardMaterial({ color: 0xc2ccd6, roughness: 0.26, metalness: 0.84 });
+    const redMat = new T.MeshBasicMaterial({ color: 0xff2244 });
+    const base = new T.Mesh(new T.BoxGeometry(2.0, 0.65, 2.0), turretMat);
+    base.position.set(0, 0.35, 0);
+    group.add(base);
+    [-0.78, 0.78].forEach((sx) => {
+      const tower = new T.Mesh(new T.BoxGeometry(0.42, 1.55, 1.15), turretMat);
+      tower.position.set(sx, 1.25, 0);
+      group.add(tower);
+    });
+    const strip = new T.Mesh(new T.BoxGeometry(1.8, 0.08, 0.08), redMat);
+    strip.position.set(0, 0.65, -1.02);
+    group.add(strip);
+    return group;
+  }
 
   if(skinId === 'Scatter'){
     const turretMat = new T.MeshStandardMaterial({ color: 0x245e35, roughness: 0.4, metalness: 0.58 });
@@ -141,6 +176,20 @@ function createFallbackGun(skinId = 'Origin'){
     const crystal = new T.Mesh(new T.OctahedronGeometry(0.28, 0), crystalMat);
     crystal.position.set(0, 3.9, 0);
     group.add(crystal);
+    return group;
+  }
+
+  if(skinId === 'RapidFire'){
+    const frameMat = new T.MeshStandardMaterial({ color: 0xaab4be, roughness: 0.3, metalness: 0.8 });
+    const barrelMat = new T.MeshStandardMaterial({ color: 0x181e24, roughness: 0.35, metalness: 0.75 });
+    const drum = new T.Mesh(new T.CylinderGeometry(0.45, 0.45, 0.9, 14), frameMat);
+    drum.rotation.z = Math.PI / 2;
+    drum.position.set(0, -0.55, 0.1);
+    group.add(drum);
+    const shroud = new T.Mesh(new T.CylinderGeometry(0.26, 0.28, 2.7, 14), barrelMat);
+    shroud.rotation.x = Math.PI / 2;
+    shroud.position.set(0, 0, -1.45);
+    group.add(shroud);
     return group;
   }
 
