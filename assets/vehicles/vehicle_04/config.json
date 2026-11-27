@@ -1,0 +1,12 @@
+{
+  "id": "Scatter",
+  "name": "Scatter",
+  "hasTurret": true,
+  "isStaffMode": false,
+  "turretPivot": [0, 1.18, -0.22],
+  "gunPivot": [0, 0.56, 0.92],
+  "minElevation": 0,
+  "maxElevation": 1.04719755,
+  "scale": 1.0,
+  "hullTurnSpeed": 9.0
+}
