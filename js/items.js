@@ -90,12 +90,11 @@ export function useInventoryItem(itemId, coopCtx = {}){
 
   if(itemId === 'hp_full'){
     if(state.activeBattleMode === 'YAJU_BOSS'){
-      const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
-      yajuState.playerHp = maxHp;
+      yajuState.playerHp = YAJU_CONFIG.playerMaxHp;
       const fill = document.getElementById('yajuHpFill');
       const txt = document.getElementById('yajuHpText');
       if(fill) fill.style.width = '100%';
-      if(txt) txt.textContent = `${maxHp} / ${maxHp}`;
+      if(txt) txt.textContent = `${YAJU_CONFIG.playerMaxHp} / ${YAJU_CONFIG.playerMaxHp}`;
     } else {
       state.peace = 100;
     }
@@ -105,12 +104,11 @@ export function useInventoryItem(itemId, coopCtx = {}){
 
   if(itemId === 'hp_half'){
     if(state.activeBattleMode === 'YAJU_BOSS'){
-      const maxHp = yajuState.playerMaxHp || YAJU_CONFIG.playerMaxHp;
-      yajuState.playerHp = Math.min(maxHp, yajuState.playerHp + Math.ceil(maxHp / 2));
+      yajuState.playerHp = Math.min(YAJU_CONFIG.playerMaxHp, yajuState.playerHp + Math.ceil(YAJU_CONFIG.playerMaxHp / 2));
       const fill = document.getElementById('yajuHpFill');
       const txt = document.getElementById('yajuHpText');
-      if(fill) fill.style.width = `${(yajuState.playerHp / maxHp) * 100}%`;
-      if(txt) txt.textContent = `${Math.ceil(yajuState.playerHp)} / ${maxHp}`;
+      if(fill) fill.style.width = `${(yajuState.playerHp / YAJU_CONFIG.playerMaxHp) * 100}%`;
+      if(txt) txt.textContent = `${Math.ceil(yajuState.playerHp)} / ${YAJU_CONFIG.playerMaxHp}`;
     } else {
       state.peace = Math.min(100, state.peace + 50);
     }
