@@ -1,6 +1,6 @@
 export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
-  scene.background = new T.Color(0x0b1f33);
-  scene.fog = new T.FogExp2(0x0b1f33, 0.008);
+  scene.background = new T.Color(0x4c96e0);
+  scene.fog = new T.FogExp2(0x4c96e0, 0.008);
 
   scene.add(new T.HemisphereLight(0xaadfff, 0x1b2d3e, 1.35));
   const sun = new T.DirectionalLight(0xfff4d8, 1.6);
@@ -9,7 +9,7 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
 
   const floor = new T.Mesh(
     new T.PlaneGeometry(42, 42),
-    new T.MeshStandardMaterial({ color: 0x16324a, roughness: 0.72, metalness: 0.15 })
+    new T.MeshStandardMaterial({ color: 0x090c2e, roughness: 0.72, metalness: 0.15 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -2;
@@ -19,7 +19,7 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
   grid.position.y = -1.98;
   scene.add(grid);
 
-  const wallMat = new T.MeshStandardMaterial({ color: 0x10273b, roughness: 0.65, metalness: 0.25 });
+  const wallMat = new T.MeshStandardMaterial({ color: 0x050621, roughness: 0.65, metalness: 0.25 });
   // js/map-home.js 23〜28行目
   const wallConfigs = [
   { w: 42, h: 8, d: 1, x: 0, y: 2, z: -21 },
