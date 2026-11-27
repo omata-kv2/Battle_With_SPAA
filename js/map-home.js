@@ -20,11 +20,12 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
   scene.add(grid);
 
   const wallMat = new T.MeshStandardMaterial({ color: 0x10273b, roughness: 0.65, metalness: 0.25 });
+  // js/map-home.js 23〜28行目
   const wallConfigs = [
-    { w: 42, h: 4, d: 1, x: 0, y: 0, z: -21 },
-    { w: 42, h: 4, d: 1, x: 0, y: 0, z: 21 },
-    { w: 1, h: 4, d: 42, x: -21, y: 0, z: 0 },
-    { w: 1, h: 4, d: 42, x: 21, y: 0, z: 0 }
+  { w: 42, h: 8, d: 1, x: 0, y: 2, z: -21 },
+  { w: 42, h: 8, d: 1, x: 0, y: 2, z: 21 },
+  { w: 1, h: 8, d: 42, x: -21, y: 2, z: 0 },
+  { w: 1, h: 8, d: 42, x: 21, y: 2, z: 0 }
   ];
   for(const wc of wallConfigs){
     const w = new T.Mesh(new T.BoxGeometry(wc.w, wc.h, wc.d), wallMat);
