@@ -1,8 +1,8 @@
 import { CONFIG } from './config.js';
 
 export function buildSkinWorld(T, scene, unlockedSkins = ['Origin'], selectedSkinId = 'Origin'){
-  scene.background = new T.Color(0x091926);
-  scene.fog = new T.FogExp2(0x091926, 0.01);
+  scene.background = new T.Color(0x4c96e0);
+  scene.fog = new T.FogExp2(0x4c96e0, 0.01);
 
   scene.add(new T.HemisphereLight(0xbbeeff, 0x162430, 1.4));
   const dir = new T.DirectionalLight(0xffffff, 1.5);
