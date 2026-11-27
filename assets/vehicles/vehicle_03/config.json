@@ -1,0 +1,9 @@
+{
+  "id": "Explosion",
+  "name": "Explosion",
+  "hasTurret": false,
+  "isStaffMode": true,
+  "staffPivot": [0, 1.6, -0.121],
+  "scale": 1.0,
+  "hullTurnSpeed": 9.0
+}
