@@ -1,6 +1,6 @@
 export function buildTestRoomWorld(T, scene){
-  scene.background = new T.Color(0x0b1d26);
-  scene.fog = new T.FogExp2(0x0b1d26, 0.01);
+  scene.background = new T.Color(0x4c96e0);
+  scene.fog = new T.FogExp2(0x4c96e0, 0.01);
 
   scene.add(new T.HemisphereLight(0xc8f7ff, 0x162630, 1.45));
   const dir = new T.DirectionalLight(0xffffff, 1.5);
