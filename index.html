@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#071522">
-<title>Cooking With SPAA v5.8α</title>
+<title>Cooking With SPAA v5.8β</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
@@ -827,7 +827,7 @@ document.addEventListener("DOMContentLoaded", function(){
     return "全ファイル200 OKですが、app.jsの読み込みに失敗しました。";
   }
 
-  import("./js/app.js?v=58a").then(function(){
+  import("./js/app.js?v=58b").then(function(){
     window.__spaaAppLoaded = true;
   }).catch(async function(err){
     var msg = (err && (err.stack || err.message)) ? (err.stack || err.message) : String(err);

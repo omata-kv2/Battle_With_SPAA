@@ -9,8 +9,8 @@ export const VEHICLE_FOLDER_MAP = {
   Beast: 'vehicle_08'
 };
 
-// 試験導入：現時点ではOriginのみ3分割GLB機体システムを適用
-export const EXPERIMENTAL_3D_SKINS = new Set(['Origin']);
+// 3分割GLB機体システム適用機体（Origin + Wirbelwind）
+export const EXPERIMENTAL_3D_SKINS = new Set(['Origin', 'Wirbelwind']);
 
 export const DEFAULT_VEHICLE_CONFIG = {
   turretPivot: [0, 1.24, -0.15],
@@ -26,7 +26,9 @@ export function getVehicleFolderCandidates(skinId = 'Origin'){
   const pluralFolder = baseFolder.replace(/^vehicle_/, 'vehicles_');
   return [
     `./assets/vehicles/${pluralFolder}`,
-    `./assets/vehicles/${baseFolder}`
+    `./assets/vehicles/${baseFolder}`,
+    `./assets/vehicles/${skinId}`,
+    `./assets/models/${skinId}`
   ];
 }
 
