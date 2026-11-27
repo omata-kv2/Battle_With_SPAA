@@ -11,7 +11,7 @@ export function buildSkinWorld(T, scene, unlockedSkins = ['Origin'], selectedSki
 
   const floor = new T.Mesh(
     new T.PlaneGeometry(38, 38),
-    new T.MeshStandardMaterial({ color: 0x122638, roughness: 0.65, metalness: 0.2 })
+    new T.MeshStandardMaterial({ color: 0xbbbcbd, roughness: 0.65, metalness: 0.2 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -2;
