@@ -9,7 +9,7 @@ export function buildTestRoomWorld(T, scene){
 
   const floor = new T.Mesh(
     new T.PlaneGeometry(38, 38),
-    new T.MeshStandardMaterial({ color: 0x132b36, roughness: 0.68, metalness: 0.18 })
+    new T.MeshStandardMaterial({ color: 0xbbbcbd, roughness: 0.68, metalness: 0.18 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -2;
