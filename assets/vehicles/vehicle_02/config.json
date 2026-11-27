@@ -1,0 +1,26 @@
+{
+  "id": "RapidFire",
+  "vehicleId": "vehicle_02",
+  "name": "RapidFire",
+  "parts": {
+    "hull": "RapidFire_hull.glb",
+    "turret": "RapidFire_turret.glb",
+    "gun": "RapidFire_gun.glb"
+  },
+  "offsets": {
+    "hull": [0, 0, 0],
+    "turret": [0, 1.18, -0.18],
+    "gun": [0, 1.62, 0.05]
+  },
+  "hullSpaceOffsets": {
+    "hull": [0, 0, 0],
+    "turret": [0, 1.18, -0.18],
+    "gun": [0, 2.8, -0.13]
+  },
+  "limits": {
+    "turretYaw360": true,
+    "gunPitchMinRad": 0,
+    "gunPitchMaxRad": 1.5707963267948966
+  },
+  "scale": 0.68
+}
