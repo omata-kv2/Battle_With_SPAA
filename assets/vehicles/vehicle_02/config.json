@@ -10,7 +10,7 @@
   "offsets": {
     "hull": [0, 0, 0],
     "turret": [0, 1.18, -0.18],
-    "gun": [0, 1.62, 0.05]
+    "gun": [0, 1.80, 0.05]
   },
   "hullSpaceOffsets": {
     "hull": [0, 0, 0],
