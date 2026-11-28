@@ -316,7 +316,8 @@ export async function loadVehicleAssets(passedLoader, skinId = 'Origin'){
   const paths = getVehicleAssetPaths(skinId);
   let cfg = {
     ...DEFAULT_VEHICLE_CONFIG,
-    ...(skinId === 'Explosion' ? { hasTurret: false, isStaffMode: true, staffPivot: [0, 1.6, -0.121] } : {})
+    ...(skinId === 'Explosion' ? { hasTurret: false, isStaffMode: true, staffPivot: [0, 1.6, -0.121] } : {}),
+    ...(skinId === 'RapidFire' ? { turretPivot: [0, 1.18, -0.18], gunPivot: [0, 1.62, 0.05] } : {})
   };
 
   for(const cfgUrl of paths.configCandidates){
