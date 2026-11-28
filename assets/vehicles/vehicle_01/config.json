@@ -35,9 +35,9 @@
     "z": 1.0
   },
   "appliedModelScale": {
-    "x": 1.75,
-    "y": 1.75,
-    "z": 1.75
+    "x": 1.0,
+    "y": 1.0,
+    "z": 1.0
  
   "hullTurnSpeed": 9.0
   }
