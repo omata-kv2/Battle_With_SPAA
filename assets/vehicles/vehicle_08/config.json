@@ -1,0 +1,33 @@
+{
+  "id": "Beast",
+  "vehicleId": "vehicle_08",
+  "name": "Beast",
+  "parts": {
+    "hull": "Beast_hull.glb",
+    "turret": "Beast_turret.glb",
+    "gun": "Beast_gun.glb"
+  },
+  "offsets": {
+    "hull": [
+      0,
+      0,
+      0
+    ],
+    "turret": [
+      0,
+      1.2,
+      -0.1
+    ],
+    "gun": [
+      0,
+      0.44,
+      -0.82
+    ]
+  },
+  "limits": {
+    "turretYaw360": true,
+    "gunPitchMinRad": 0,
+    "gunPitchMaxRad": 1.5707963267948966
+  },
+  "scale": 0.68
+}

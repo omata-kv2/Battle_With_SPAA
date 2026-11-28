@@ -1,0 +1,33 @@
+{
+  "id": "Automatic",
+  "vehicleId": "vehicle_06",
+  "name": "Automatic",
+  "parts": {
+    "hull": "Automatic_hull.glb",
+    "turret": "Automatic_turret.glb",
+    "gun": "Automatic_gun.glb"
+  },
+  "offsets": {
+    "hull": [
+      0,
+      0,
+      0
+    ],
+    "turret": [
+      0,
+      1.12,
+      -0.08
+    ],
+    "gun": [
+      0,
+      0.62,
+      -0.06
+    ]
+  },
+  "limits": {
+    "turretYaw360": true,
+    "gunPitchMinRad": 0,
+    "gunPitchMaxRad": 1.5707963267948966
+  },
+  "scale": 0.68
+}
