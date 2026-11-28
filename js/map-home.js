@@ -9,7 +9,7 @@ export function buildHomeWorld(T, scene, gold = 0, yajuCoins = 0){
 
   const floor = new T.Mesh(
     new T.PlaneGeometry(42, 42),
-    new T.MeshStandardMaterial({ color: 0x090c2e, roughness: 0.72, metalness: 0.15 })
+    new T.MeshStandardMaterial({ color: 0xb9b9bd, roughness: 0.72, metalness: 0.15 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -2;
