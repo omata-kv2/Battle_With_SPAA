@@ -1,0 +1,33 @@
+{
+  "id": "Explosion",
+  "vehicleId": "vehicle_03",
+  "name": "Explosion",
+  "parts": {
+    "hull": "Explosion_hull.glb",
+    "turret": "Explosion_turret.glb",
+    "gun": "Explosion_gun.glb"
+  },
+  "offsets": {
+    "hull": [
+      0,
+      0,
+      0
+    ],
+    "turret": [
+      0,
+      1.2,
+      0.35
+    ],
+    "gun": [
+      0,
+      0.62,
+      -1.1
+    ]
+  },
+  "limits": {
+    "turretYaw360": true,
+    "gunPitchMinRad": 0,
+    "gunPitchMaxRad": 1.5707963267948966
+  },
+  "scale": 0.68
+}
